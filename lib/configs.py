@@ -410,7 +410,8 @@ def waybar(t, d):
         "group/start": {"orientation": "horizontal", "modules": ["image#logo", "hyprland/workspaces"]},
         "group/status": {"orientation": "horizontal",
                          "modules": ["custom/vpn", "network", "pulseaudio", "battery", "tray", "custom/power"]},
-        "image#logo": {"path": f"{d}/icon.png", "size": 20, "on-click": "cisa-menu",
+        # PNG rendered from the vector at 2x (an SVG here made Waybar hit a Wayland protocol error)
+        "image#logo": {"path": f"{d}/icon-bar.png", "size": 22, "on-click": "cisa-menu",
                        "tooltip": False},
         "hyprland/workspaces": {"format": "{name}", "on-click": "activate", "sort-by-number": True,
                                 "persistent-workspaces": {"*": 5}},

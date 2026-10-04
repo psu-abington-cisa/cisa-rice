@@ -30,6 +30,7 @@ if PIDFILE.exists():
 try:
     import gi
     gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
     gi.require_version("GtkLayerShell", "0.1")
     from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk, GtkLayerShell, Pango
 except (ImportError, ValueError):
@@ -116,6 +117,8 @@ class Menu(Gtk.Window):
         self.by_id = {a.get_id(): a for a in self.apps}
         self.filter_cat = None
 
+        self.set_skip_taskbar_hint(True)       # don't show up as a task in Plasma's panel
+        self.set_skip_pager_hint(True)
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_namespace(self, "cisa-menu")
@@ -161,10 +164,12 @@ class Menu(Gtk.Window):
     def header(self):
         box = Gtk.Box(spacing=14)
         box.get_style_context().add_class("header")
-        icon = DATA / "icon.png"
+        icon = DATA / "icon.svg" if (DATA / "icon.svg").exists() else DATA / "icon.png"
         if icon.exists():
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(icon), 44, 44, True)
-            box.pack_start(Gtk.Image.new_from_pixbuf(pb), False, False, 0)
+            scale = self.get_scale_factor() or 1          # render the vector at the screen's real pixel size
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(icon), 46 * scale, 46 * scale, True)
+            surface = Gdk.cairo_surface_create_from_pixbuf(pb, scale, None)
+            box.pack_start(Gtk.Image.new_from_surface(surface), False, False, 0)
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         g = Gtk.Label(label=greeting(), xalign=0)
         g.get_style_context().add_class("greeting")
@@ -222,9 +227,12 @@ class Menu(Gtk.Window):
         who = Gtk.Label(label=f"{os.environ.get('USER', '')}@{os.uname().nodename}", xalign=0)
         who.get_style_context().add_class("who")
         box.pack_start(who, True, True, 0)
+        in_kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "")
+        logout = (["qdbus6", "org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown.logout"] if in_kde
+                  else ["hyprctl", "dispatch", "exit"])
         for icon_name, tip, cmd in (("system-shutdown-symbolic", "Shut down", ["systemctl", "poweroff"]),
                                     ("system-reboot-symbolic", "Restart", ["systemctl", "reboot"]),
-                                    ("system-log-out-symbolic", "Log out", ["hyprctl", "dispatch", "exit"]),
+                                    ("system-log-out-symbolic", "Log out", logout),
                                     ("system-lock-screen-symbolic", "Lock", ["loginctl", "lock-session"])):
             box.pack_end(self.icon_button(icon_name, tip, cmd), False, False, 0)
         return box

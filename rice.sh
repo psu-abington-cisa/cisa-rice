@@ -43,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --yes|-y) ASSUME_YES=1 ;;
     --list)   ACTION=list ;;
     --restore) ACTION=restore ;;
+    --plasma-panel-only) ACTION=panel; LAYOUT=${2:-dock}; shift ;;
     --version) echo "cisa-rice $VERSION"; exit 0 ;;
     -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "Unknown option: $1 (see --help)" ;;
@@ -60,7 +61,7 @@ fi
 # ---------- backup / restore -------------------------------------------------
 CONF_DIRS=(hypr waybar fuzzel wlogout swaync kitty btop cava fastfetch)
 CONF_FILES=(starship.toml kdeglobals kwinrc plasmarc kcminputrc konsolerc kscreenlockerrc plasmashellrc
-            plasma-org.kde.plasma.desktop-appletsrc)
+            plasma-org.kde.plasma.desktop-appletsrc kglobalshortcutsrc)
 
 migrate_v1() {
   # CISA Rice 1.x kept the theme name in a *file* called "current" (2.x uses that path as a folder),
@@ -86,7 +87,7 @@ do_restore() {
   c_info "Restoring your original desktop settings"
   local x
   for x in "${CONF_DIRS[@]}"; do rm -rf "${CONF:?}/$x"; done
-  rm -f "$CONF/starship.toml"
+  rm -f "$CONF/starship.toml" "$CONF/plasma-workspace/env/cisa-rice.sh" "$CONF/autostart/cisa-plasma-panel.desktop"
   if [[ -f $BACKUP/home.tgz ]]; then
     tar -C "$HOME" -xzf "$BACKUP/home.tgz"
   else
@@ -165,6 +166,16 @@ Exec=konsole --hold -e "$HERE/rice.sh"
 Icon=cisa-logo
 Categories=Settings;DesktopSettings;
 EOF
+  # the CISA menu as an app: Plasma's panel Start button and the Meta key launch it
+  cat > "$DATA/applications/cisa-menu.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=CISA Menu
+Comment=Apps, CISA tools and power options
+Exec=cisa-menu
+Icon=cisa-logo
+NoDisplay=true
+EOF
 }
 
 # ---------- choosing ---------------------------------------------------------
@@ -223,27 +234,99 @@ EOF
   kw --file konsolerc --group "Desktop Entry" --key DefaultProfile "CISA.profile"
   kw --file kwinrc --group Plugins --key blurEnabled true
   qdb org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
-  [[ -n $LAYOUT ]] && in_plasma && apply_plasma_panel "$LAYOUT"
+  # The Meta key opens the CISA menu. In Plasma 6, Meta alone is an ordinary global shortcut, held by
+  # KWin (kglobalaccel runs inside it) and written back on logout, so edits during a session don't stick.
+  # Plasma runs ~/.config/plasma-workspace/env/*.sh at every login *before* KWin starts: set it there.
+  mkdir -p "$CONF/plasma-workspace/env"
+  cat > "$CONF/plasma-workspace/env/cisa-rice.sh" <<'EOF'
+#!/bin/sh
+# CISA Rice: Meta (the Windows key) opens the CISA menu instead of the default launcher (Alt+F1 still does).
+kwriteconfig6 --file kglobalshortcutsrc --group plasmashell --key "activate application launcher" "Alt+F1,Meta	Alt+F1,Activate Application Launcher"
+kwriteconfig6 --file kglobalshortcutsrc --group services --group cisa-menu.desktop --key _launch "Meta"
+EOF
+  if in_plasma; then
+    apply_plasma_panel "${LAYOUT:-dock}"
+  else
+    # plasmashell isn't running (e.g. we're in Hyprland): rearrange the panel at the next Plasma login
+    mkdir -p "$CONF/autostart"
+    cat > "$CONF/autostart/cisa-plasma-panel.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=CISA panel setup
+Exec=sh -c '"$HERE/rice.sh" --plasma-panel-only ${LAYOUT:-dock}; rm -f "$CONF/autostart/cisa-plasma-panel.desktop"'
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=2
+EOF
+  fi
   c_ok "Plasma desktop themed too (pick it or Hyprland on the login screen)"
 }
 
-apply_plasma_panel() {  # rebuild the Plasma taskbar win10/win11 style, keeping pinned apps
-  local win11=false; [[ $1 == win11 ]] && win11=true
-  qdb org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$(cat <<EOF
+apply_plasma_panel() {  # dock (default): floating, centred, fits its contents. full: classic full-width taskbar
+  local fit=true; [[ ${1:-dock} == full || $1 == win10 ]] && fit=false
+  local js out id
+  js=$(cat <<EOF
 var launchers = [];
 panels().forEach(function (p) { p.widgets("org.kde.plasma.icontasks").forEach(function (w) {
   w.currentConfigGroup = ["General"]; var l = w.readConfig("launchers", "");
   if (typeof l === "string") l = l.length ? l.split(",") : []; if (l.length) launchers = l; }); });
 panels().forEach(function (p) { p.remove(); });
-var panel = new Panel; panel.location = "bottom"; panel.height = 2 * Math.floor(gridUnit * 2.4 / 2);
-try { panel.floating = $win11; } catch (e) {}
-if ($win11) panel.addWidget("org.kde.plasma.panelspacer");
-var k = panel.addWidget("org.kde.plasma.kickoff"); k.currentConfigGroup = ["General"]; k.writeConfig("icon", "cisa-logo");
-var t = panel.addWidget("org.kde.plasma.icontasks"); t.currentConfigGroup = ["General"]; t.writeConfig("launchers", launchers);
-panel.addWidget($win11 ? "org.kde.plasma.panelspacer" : "org.kde.plasma.marginsseparator");
-panel.addWidget("org.kde.plasma.systemtray"); panel.addWidget("org.kde.plasma.digitalclock"); panel.addWidget("org.kde.plasma.showdesktop");
+var panel = new Panel;
+panel.location = "bottom";
+panel.height = 2 * Math.floor(gridUnit * 2.3 / 2);
+try { panel.floating = true; } catch (e) {}
+if ($fit) { try { panel.lengthMode = "fit"; } catch (e) {} try { panel.alignment = "center"; } catch (e) {} }
+var start = panel.addWidget("org.kde.plasma.icon");
+start.currentConfigGroup = ["General"];
+start.writeConfig("url", "file://$DATA/applications/cisa-menu.desktop");
+var t = panel.addWidget("org.kde.plasma.icontasks");
+t.currentConfigGroup = ["General"];
+t.writeConfig("launchers", launchers);
+t.writeConfig("maxStripes", 1);
+panel.addWidget("org.kde.plasma.marginsseparator");
+panel.addWidget("org.kde.plasma.systemtray");
+var clock = panel.addWidget("org.kde.plasma.digitalclock");
+clock.currentConfigGroup = ["Appearance"];
+clock.writeConfig("showDate", true);
+clock.writeConfig("dateDisplayFormat", 1);
+clock.writeConfig("dateFormat", "custom");
+clock.writeConfig("customDateFormat", "ddd d MMM");
+clock.writeConfig("use24hFormat", 2);
+clock.writeConfig("autoFontAndSize", false);
+clock.writeConfig("fontFamily", "JetBrains Mono");
+clock.writeConfig("fontWeight", 600);
+clock.writeConfig("fontSize", 10);
+if (!$fit) panel.addWidget("org.kde.plasma.showdesktop");
+print(panel.id);
 EOF
-)" >/dev/null 2>&1 || c_warn "Couldn't rearrange the Plasma taskbar"
+)
+  out=$(qdb org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$js" 2>/dev/null) \
+    || { c_warn "Couldn't rearrange the Plasma panel"; return 0; }
+  id=$(grep -oE '[0-9]+' <<<"$out" | tail -1)
+  if [[ -n $id ]]; then
+    # translucent panel with blur behind it (0 adaptive, 1 opaque, 2 translucent); needs a shell restart
+    kw --file plasmashellrc --group PlasmaViews --group "Panel $id" --key panelOpacity 2
+    systemctl --user restart plasma-plasmashell.service >/dev/null 2>&1 || true
+  fi
+  if [[ $fit == true ]]; then c_ok "Plasma panel: floating dock"; else c_ok "Plasma panel: floating taskbar"; fi
+}
+
+HYPR_UNITS=(waybar.service swaync.service hypridle.service hyprpaper.service hyprpolkitagent.service hyprsunset.service)
+
+disable_global_autostart() {
+  # Debian's waybar, swaync and hypr* packages enable systemd user units for *every* graphical session:
+  # that put Waybar (and hypridle) inside Plasma and raced the Hyprland session's own copies.
+  # The Hyprland session starts everything it needs itself (hyprland.conf exec-once).
+  local u need=()
+  for u in "${HYPR_UNITS[@]}"; do
+    [[ -e /etc/systemd/user/graphical-session.target.wants/$u ]] && need+=("$u")
+  done
+  if [[ ${#need[@]} -gt 0 ]]; then
+    sudo systemctl --global disable "${need[@]}" >/dev/null 2>&1 || true
+    c_ok "Stopped Hyprland's bar/notifications/idle services auto-starting in every session"
+  fi
+  systemctl --user disable "${HYPR_UNITS[@]}" >/dev/null 2>&1 || true
+  if in_plasma; then systemctl --user stop "${HYPR_UNITS[@]}" >/dev/null 2>&1 || true; fi
 }
 
 # ---------- terminal ---------------------------------------------------------
@@ -290,9 +373,15 @@ apply_login_screen() {
 }
 
 # ---------- main -------------------------------------------------------------
+if [[ $ACTION == panel ]]; then
+  in_plasma && apply_plasma_panel "$LAYOUT"
+  exit 0
+fi
+
 mkdir -p "$STATE"
 migrate_v1
 install_deps
+disable_global_autostart
 install_helpers
 [[ -z $THEME_ID ]] && choose_theme
 [[ -n $THEME_ID && -f $HERE/themes/$THEME_ID.theme ]] || die "Unknown theme '$THEME_ID'. Try --list."

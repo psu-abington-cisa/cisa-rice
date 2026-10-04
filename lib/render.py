@@ -46,7 +46,9 @@ def main():
     # artwork (vector, rendered at full resolution so nothing is blurry)
     render_png(art.wallpaper_svg(t), cur / "wallpaper.png", w, h)
     render_png(art.lock_svg(t), cur / "lock.png", w, h)
-    render_png(art.icon_svg(t), cur / "icon.png", 512, 512)
+    render_png(art.icon_svg(t), cur / "icon.png", 512, 512)       # for fastfetch (kitty image protocol)
+    (cur / "icon.svg").write_text(art.icon_svg(t))                 # the menu loads the vector directly
+    render_png(art.icon_svg(t), cur / "icon-bar.png", 44, 44)      # Waybar logo: rendered from the vector at 2x
     for name, svg in configs.wlogout_icons(t).items():
         (cur / "wlogout" / f"{name}.svg").write_text(svg)
 

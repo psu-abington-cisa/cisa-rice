@@ -76,7 +76,25 @@ else
   gexec 30 'mkdir -p /home/cisa/cisa-rice && tar xzf - -C /home/cisa/cisa-rice && chown -R cisa:cisa /home/cisa/cisa-rice && echo uploaded' "$T/repo.tgz"
   gexec 900 "$AS_USER WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=KDE bash $RICE --theme ${THEMES[0]} --yes 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -16" || echo "  !! rice.sh failed"
 fi
-sleep 5; shot "plasma-${THEMES[0]}"
+sleep 5; gexec 10 "pkill -f firefox-esr; true" >/dev/null 2>&1 || true; sleep 3; shot "plasma-${THEMES[0]}"
+# Super (Meta) in Plasma should open the CISA menu
+echo "sendkey meta_l" | socat - UNIX-CONNECT:"$MON" >/dev/null; sleep 4; shot "plasma-menu"
+gexec 10 "pgrep -af cisa-menu | head -2; pkill -f bin/cisa-menu; rm -f /run/user/1000/cisa-menu.pid; true" || true
+if [[ ${PLASMA_DEBUG:-} == 1 ]]; then
+  echo "== plasma debug"
+  gexec 30 "$AS_USER bash -c 'echo launch=\$(kreadconfig6 --file kglobalshortcutsrc --group services --group cisa-menu.desktop --key _launch); echo launcher=\$(kreadconfig6 --file kglobalshortcutsrc --group plasmashell --key \"activate application launcher\"); systemctl --user list-units --no-pager | grep -E \"waybar|hypridle|swaync\" || echo \"no hypr units running in plasma\"'" || true
+  shot "plasma-menu-direct"
+  gexec 10 "pkill -f bin/cisa-menu; true" >/dev/null 2>&1 || true
+  echo "== plasma relogin, then Super"
+  gexec 30 "grep -q '^Relogin=' /etc/sddm.conf && sed -i 's/^Relogin=.*/Relogin=true/' /etc/sddm.conf || sed -i '/^\[Autologin\]/a Relogin=true' /etc/sddm.conf; pkill -x plasmashell; systemctl restart sddm; echo restarted" || true
+  sleep 15
+  for i in $(seq 1 30); do sleep 4; gexec 10 'pgrep -x plasmashell >/dev/null' >/dev/null 2>&1 && break; done
+  sleep 20
+  echo "sendkey meta_l 150" | socat - UNIX-CONNECT:"$MON" >/dev/null; sleep 5; shot "plasma-menu-relogin"
+  gexec 10 "pgrep -af 'bin/cisa-menu' | grep -v pgrep | head -2 || echo 'menu not running'" || true
+  gexec 30 "$AS_USER bash -c 'echo launch=\$(kreadconfig6 --file kglobalshortcutsrc --group services --group cisa-menu.desktop --key _launch); pgrep -af bin/cisa-menu | grep -v pgrep || echo \"menu not running\"'" || true
+  exit 0
+fi
 
 echo "== logging into the Hyprland session"
 # live-config writes the Plasma autologin into /etc/sddm.conf, which beats conf.d drop-ins
@@ -86,7 +104,7 @@ sleep 8
 gexec 30 "$HYPR_ENV; echo sig=\$sig wl=\$wl; ps -eo comm,args | grep -iE '^(hyprland|\.?hypr|waybar|swaync|swaybg|hypridle|plasmashell)' | cut -c1-90; echo '-- version:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl version | head -2; echo '-- config errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl configerrors; echo '-- log tail:'; tail -15 /run/user/1000/hypr/\$sig/hyprland.log 2>/dev/null | cut -c1-160" || true
 shot "hypr-first-login"
 gexec 10 "echo -n 'papirus kali-* icons: '; ls /usr/share/icons/Papirus/48x48/apps 2>/dev/null | grep -c '^kali-'; ls /usr/share/icons/Papirus/48x48/apps | grep -E '^(kali-(nmap|metasploit-framework|ghidra|burpsuite|sqlmap|john|hashcat)|ghidra|burpsuite|btop)\.svg' | tr '\n' ' '; echo" || true
-gexec 10 "echo '-- waybar.log (session start):'; head -c 2500 /run/user/1000/waybar.log 2>/dev/null | grep -viE 'info|^\$' | head -25" || true
+gexec 10 "echo '-- waybar.log:'; echo \"starts: \$(grep -c 'starting waybar' /run/user/1000/waybar.log 2>/dev/null)\"; grep -viE 'info|No batteries|minimum height|^\$' /run/user/1000/waybar.log 2>/dev/null | tail -12" || true
 echo "== waybar check"
 gexec 40 "$HYPR_ENV; if pgrep -x waybar >/dev/null; then echo 'waybar running'; else echo 'waybar NOT running; starting it to capture errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig WAYLAND_DISPLAY=\$wl XDG_CURRENT_DESKTOP=Hyprland timeout 8 waybar 2>&1 | grep -viE 'debug|^\$' | tail -15; fi; grep -i waybar /home/cisa/.local/share/sddm/wayland-session.log 2>/dev/null | tail -5" || true
 

@@ -368,9 +368,12 @@ def lock_svg(t):
 
 
 def icon_svg(t, size=512):
-    """App-icon style mark: the badge, or the ci mark on a rounded tile (from the logo concepts)."""
-    if t["MARK"] == "badge":
-        return svg_doc(badge(0, 0, size), size, size)
+    """The CISA badge (vector) is the desktop's logo in every theme: bar, menu, fetch, start button."""
+    return svg_doc(badge(0, 0, size), size, size)
+
+
+def ci_tile_svg(t, size=512):
+    """The ci mark on a rounded tile (from the logo concepts); kept for anyone who prefers it."""
     body = (f'<rect width="{size}" height="{size}" rx="{size * 0.22:.0f}" fill="{t["PANEL"]}"/>'
             + ci_mark(size * 0.19, size * 0.19, size * 0.62, t["BG"] if t["DARK"] else t["SURFACE"],
                       t["ACCENT_ON_PANEL"]))

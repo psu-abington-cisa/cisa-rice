@@ -51,7 +51,10 @@ seal from the CISA logo concepts. The badge is redrawn as a pure vector
   `fetch` for system info with the CISA mark (sharp, via the kitty image protocol).
 - **TUI apps:** btop, cava, a big clock and a calendar, all themed. **Super+D** opens the dashboard
   (system info, clock and calendar, tiled).
-- **Plasma:** gets the same colors, wallpaper, lock screen, login screen and Konsole colors.
+- **Plasma:** gets the same colors, wallpaper, lock screen, login screen and Konsole colors, plus a
+  floating dock (CISA Start button, pinned apps, tray, single-line clock). In Plasma, the Start button
+  and the **Super key** also open the CISA menu (Super takes effect after you log out and back in;
+  KDE's own menu stays on Alt+F1). Use `--layout full` for a classic full-width taskbar instead.
 
 ## Keys (Super = the Windows key)
 
