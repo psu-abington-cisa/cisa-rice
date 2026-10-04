@@ -62,6 +62,13 @@ CONF_DIRS=(hypr waybar fuzzel wlogout swaync kitty btop cava fastfetch)
 CONF_FILES=(starship.toml kdeglobals kwinrc plasmarc kcminputrc konsolerc kscreenlockerrc plasmashellrc
             plasma-org.kde.plasma.desktop-appletsrc)
 
+migrate_v1() {
+  # CISA Rice 1.x kept the theme name in a *file* called "current" (2.x uses that path as a folder),
+  # rendered into "generated/", and backed up loose files instead of home.tgz.
+  if [[ -f $STATE/current ]]; then mv -f "$STATE/current" "$STATE/current-theme"; fi
+  rm -rf "$STATE/generated"
+}
+
 take_backup() {
   [[ -e $BACKUP/.taken ]] && return 0          # keep the original pre-rice state, never overwrite it
   mkdir -p "$BACKUP"
@@ -80,7 +87,16 @@ do_restore() {
   local x
   for x in "${CONF_DIRS[@]}"; do rm -rf "${CONF:?}/$x"; done
   rm -f "$CONF/starship.toml"
-  tar -C "$HOME" -xzf "$BACKUP/home.tgz"
+  if [[ -f $BACKUP/home.tgz ]]; then
+    tar -C "$HOME" -xzf "$BACKUP/home.tgz"
+  else
+    # backup made by CISA Rice 1.x: loose copies of Plasma config files and .bashrc
+    for x in "$BACKUP"/*; do
+      [[ -f $x ]] || continue
+      if [[ $(basename "$x") == .bashrc ]]; then cp -a "$x" "$HOME/.bashrc"; else cp -a "$x" "$CONF/"; fi
+    done
+    [[ -f $BACKUP/.bashrc ]] && cp -a "$BACKUP/.bashrc" "$HOME/.bashrc"
+  fi
   sed -i '/^# >>> cisa-rice >>>$/,/^# <<< cisa-rice <<<$/d' "$HOME/.bashrc" 2>/dev/null || true
   rm -f "$STATE/current-theme"
   if in_plasma; then
@@ -159,7 +175,7 @@ choose_theme() {
     for id in "${ids[@]}"; do
       args+=("$id" "$(theme_field "$id" NAME): $(theme_field "$id" DESC)" "$([[ $id == "$cur" ]] && echo on || echo off)")
     done
-    THEME_ID=$(kdialog --title "CISA Themes" --geometry 680x420 --radiolist "Pick a look for your desktop:" "${args[@]}") || exit 0
+    THEME_ID=$(kdialog --title "CISA Themes" --radiolist "Pick a look for your desktop:" "${args[@]}" 2>/dev/null) || exit 0
   elif have whiptail; then
     for id in "${ids[@]}"; do args+=("$id" "$(theme_field "$id" DESC)" "$([[ $id == "$cur" ]] && echo ON || echo OFF)"); done
     THEME_ID=$(whiptail --title "CISA Themes" --radiolist "Pick a look:" 18 78 9 "${args[@]}" 3>&1 1>&2 2>&3 </dev/tty) || exit 0
@@ -251,8 +267,8 @@ reload_hypr() {
   hyprctl reload >/dev/null 2>&1 || true
   pkill -x swaybg 2>/dev/null || true
   setsid -f swaybg -i "$CUR/wallpaper.png" -m fill >/dev/null 2>&1
-  pkill -x waybar 2>/dev/null || true
-  setsid -f waybar >/dev/null 2>&1
+  # reload Waybar's config and style in place (the session's restart loop keeps it alive)
+  if pgrep -x waybar >/dev/null; then pkill -USR2 -x waybar; else setsid -f waybar >/dev/null 2>&1; fi
   swaync-client -rs >/dev/null 2>&1 || true
   hyprctl setcursor "$(theme_field "$THEME_ID" CURSOR)" 24 >/dev/null 2>&1 || true
   local errs; errs=$(hyprctl configerrors 2>/dev/null | grep -v '^$' || true)
@@ -273,6 +289,7 @@ apply_login_screen() {
 
 # ---------- main -------------------------------------------------------------
 mkdir -p "$STATE"
+migrate_v1
 install_deps
 install_helpers
 [[ -z $THEME_ID ]] && choose_theme

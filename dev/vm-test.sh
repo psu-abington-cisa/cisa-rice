@@ -59,6 +59,12 @@ done
 sleep 10
 
 RICE=/home/cisa/cisa-rice/rice.sh
+if [[ -n ${UPGRADE_FROM:-} ]]; then
+  # simulate an existing user: install an older release first (e.g. UPGRADE_FROM=6e9101d for 1.0)
+  echo "== installing old release $UPGRADE_FROM first"
+  gexec 600 "$AS_USER WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=KDE bash -c 'mkdir -p ~/old && curl -fsSL https://github.com/psu-abington-cisa/cisa-rice/archive/$UPGRADE_FROM.tar.gz | tar xz -C ~/old --strip-components=1 && bash ~/old/rice.sh --theme daylight --yes' 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -6" || echo "  !! old release failed"
+  gexec 10 "ls -la /home/cisa/.local/share/cisa-rice/" || true
+fi
 if [[ ${FROM_GITHUB:-} == 1 ]]; then
   URL=https://raw.githubusercontent.com/psu-abington-cisa/cisa-rice/main/install.sh
   echo "== installing from GitHub (Plasma session): $URL"
@@ -79,6 +85,8 @@ for i in $(seq 1 30); do sleep 4; gexec 10 'pgrep -f -i "bin/hyprland" >/dev/nul
 sleep 8
 gexec 30 "$HYPR_ENV; echo sig=\$sig wl=\$wl; ps -eo comm,args | grep -iE '^(hyprland|\.?hypr|waybar|swaync|swaybg|hypridle|plasmashell)' | cut -c1-90; echo '-- version:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl version | head -2; echo '-- config errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl configerrors; echo '-- log tail:'; tail -15 /run/user/1000/hypr/\$sig/hyprland.log 2>/dev/null | cut -c1-160" || true
 shot "hypr-first-login"
+echo "== waybar check"
+gexec 40 "$HYPR_ENV; if pgrep -x waybar >/dev/null; then echo 'waybar running'; else echo 'waybar NOT running; starting it to capture errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig WAYLAND_DISPLAY=\$wl XDG_CURRENT_DESKTOP=Hyprland timeout 8 waybar 2>&1 | grep -viE 'debug|^\$' | tail -15; fi; grep -i waybar /home/cisa/.local/share/sddm/wayland-session.log 2>/dev/null | tail -5" || true
 
 for th in "${THEMES[@]}"; do
   echo "== theme: $th"
@@ -96,3 +104,7 @@ gexec 10 "pkill -x fuzzel; $HYPR_USER setsid -f cisa-power >/dev/null 2>&1; true
 gexec 10 "pkill -x wlogout; $HYPR_USER setsid -f cisa-keys >/dev/null 2>&1; true" >/dev/null; sleep 3; shot "ui-keys"
 gexec 10 "pkill -x fuzzel; $HYPR_USER setsid -f hyprlock >/dev/null 2>&1; true" >/dev/null; sleep 4; shot "ui-lock"
 gexec 20 "$HYPR_ENV; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl configerrors" || true
+gexec 10 "pkill -x hyprlock; true" >/dev/null 2>&1 || true
+
+echo "== restore"
+gexec 120 "$HYPR_USER bash $RICE --restore 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -4; ls /home/cisa/.config | tr '\n' ' '; echo; grep -c cisa-rice /home/cisa/.bashrc || true" || echo "  !! restore failed"

@@ -75,7 +75,9 @@ $browser = firefox-esr
 $menu = fuzzel
 
 # ---------- autostart
-exec-once = waybar
+# Waybar can exit if it starts before the session bus/portals are ready: restart it a few times.
+# (Theme changes reload it in place with SIGUSR2, so this never spawns duplicates.)
+exec-once = sh -c 'for i in 1 2 3 4 5 6; do waybar; sleep 2; done'
 exec-once = swaync
 exec-once = swaybg -i {d}/wallpaper.png -m fill
 exec-once = hypridle
@@ -748,7 +750,8 @@ def fastfetch(t, d):
             "display": {"separator": "  ", "color": {"keys": k}, "key": {"width": 10}}, "modules": modules}
     # "kitty" (not "kitty-direct"): sends the image itself, so fastfetch doesn't query kitty's version,
     # whose late reply can leak into the prompt on slow machines
-    img = dict(base, logo={"type": "kitty", "source": f"{d}/icon.png", "width": 22, "height": 11,
+    # recache: the icon file keeps its path across themes, so don't reuse fastfetch's cached copy
+    img = dict(base, logo={"type": "kitty", "source": f"{d}/icon.png", "width": 22, "height": 11, "recache": True,
                             "padding": {"top": 1, "left": 2, "right": 4}})
     ascii_logo = (f"$1   ▄▄██████▄▄\n$1 ▄████▀▀▀▀████▀\n$1████▀      $2▐██▌$1\n$1████       $2▐██▌$1\n"
                   f"$1████▄      $2▐██▌$1\n$1 ▀████▄▄▄▄████▄\n$1   ▀▀██████▀▀\n")

@@ -37,6 +37,8 @@ def main():
     home = pathlib.Path(a.home)
     cfg_home, data_home = home / ".config", home / ".local/share"
     cur = data_home / "cisa-rice/current"
+    if cur.is_file():          # CISA Rice 1.x stored the theme name in a file at this path
+        cur.unlink()
     (cur / "wlogout").mkdir(parents=True, exist_ok=True)
     w, h = (int(x) for x in a.size.split("x"))
     t = art.load_theme(a.theme)
