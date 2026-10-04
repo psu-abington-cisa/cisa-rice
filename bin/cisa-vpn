@@ -13,5 +13,5 @@ fi
 if [[ -n $ip4 ]]; then
   printf '{"text":"\\uf132 %s","class":"on","tooltip":"Lab VPN connected (tun0)\\nClick to copy your IP"}\n' "$ip4"
 else
-  printf '{"text":"\\uf132 vpn off","class":"off","tooltip":"Lab VPN not connected"}\n'
+  printf '{"text":"\\uf132","class":"off","tooltip":"Lab VPN not connected"}\n'
 fi

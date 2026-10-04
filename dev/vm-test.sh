@@ -85,6 +85,8 @@ for i in $(seq 1 30); do sleep 4; gexec 10 'pgrep -f -i "bin/hyprland" >/dev/nul
 sleep 8
 gexec 30 "$HYPR_ENV; echo sig=\$sig wl=\$wl; ps -eo comm,args | grep -iE '^(hyprland|\.?hypr|waybar|swaync|swaybg|hypridle|plasmashell)' | cut -c1-90; echo '-- version:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl version | head -2; echo '-- config errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl configerrors; echo '-- log tail:'; tail -15 /run/user/1000/hypr/\$sig/hyprland.log 2>/dev/null | cut -c1-160" || true
 shot "hypr-first-login"
+gexec 10 "echo -n 'papirus kali-* icons: '; ls /usr/share/icons/Papirus/48x48/apps 2>/dev/null | grep -c '^kali-'; ls /usr/share/icons/Papirus/48x48/apps | grep -E '^(kali-(nmap|metasploit-framework|ghidra|burpsuite|sqlmap|john|hashcat)|ghidra|burpsuite|btop)\.svg' | tr '\n' ' '; echo" || true
+gexec 10 "echo '-- waybar.log (session start):'; head -c 2500 /run/user/1000/waybar.log 2>/dev/null | grep -viE 'info|^\$' | head -25" || true
 echo "== waybar check"
 gexec 40 "$HYPR_ENV; if pgrep -x waybar >/dev/null; then echo 'waybar running'; else echo 'waybar NOT running; starting it to capture errors:'; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig WAYLAND_DISPLAY=\$wl XDG_CURRENT_DESKTOP=Hyprland timeout 8 waybar 2>&1 | grep -viE 'debug|^\$' | tail -15; fi; grep -i waybar /home/cisa/.local/share/sddm/wayland-session.log 2>/dev/null | tail -5" || true
 
@@ -99,8 +101,10 @@ for th in "${THEMES[@]}"; do
 done
 
 echo "== launcher, power menu, lock screen (${THEMES[-1]})"
-gexec 10 "$HYPR_USER setsid -f fuzzel >/dev/null 2>&1; true" >/dev/null; sleep 3; shot "ui-launcher"
-gexec 10 "pkill -x fuzzel; $HYPR_USER setsid -f cisa-power >/dev/null 2>&1; true" >/dev/null; sleep 3; shot "ui-power-menu"
+gexec 10 "$HYPR_USER setsid -f cisa-menu >/dev/null 2>&1; true" >/dev/null; sleep 4; shot "ui-launcher"
+gexec 10 "pkill -f bin/cisa-menu; rm -f /run/user/1000/cisa-menu.pid; true" >/dev/null 2>&1 || true
+gexec 20 "$HYPR_USER hyprctl dispatch workspace 2 >/dev/null; $HYPR_USER setsid -f kitty bash -c 'cd ~/cisa-rice && ls --color=always && echo && exec bash' >/dev/null 2>&1; true" >/dev/null; sleep 5; shot "ui-terminal"
+gexec 10 "$HYPR_USER setsid -f cisa-power >/dev/null 2>&1; true" >/dev/null; sleep 3; shot "ui-power-menu"
 gexec 10 "pkill -x wlogout; $HYPR_USER setsid -f cisa-keys >/dev/null 2>&1; true" >/dev/null; sleep 3; shot "ui-keys"
 gexec 10 "pkill -x fuzzel; $HYPR_USER setsid -f hyprlock >/dev/null 2>&1; true" >/dev/null; sleep 4; shot "ui-lock"
 gexec 20 "$HYPR_ENV; runuser -u cisa -- env $USER_ENV HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl configerrors" || true

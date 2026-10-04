@@ -116,6 +116,7 @@ do_restore() {
 PKGS=(waybar fuzzel kitty wlogout sway-notification-center swaybg grim slurp wl-clipboard cliphist
       brightnessctl playerctl pavucontrol-qt network-manager-gnome libnotify-bin xdg-user-dirs
       btop cava fastfetch cbonsai starship librsvg2-bin python3 kdialog
+      python3-gi gir1.2-gtk-3.0 gir1.2-gtklayershell-0.1
       fonts-jetbrains-mono fonts-font-awesome papirus-icon-theme bibata-cursor-theme)
 BPO_PKGS=(hyprland hyprlock hypridle hyprpicker hyprpolkitagent xdg-desktop-portal-hyprland)
 
@@ -252,9 +253,9 @@ apply_shell() {
   cat >> "$HOME/.bashrc" <<'EOF'
 # >>> cisa-rice >>>
 if [[ $- == *i* ]]; then
-  if [[ -z ${CISA_NO_FETCH:-} ]] && command -v fastfetch >/dev/null; then
-    if [[ $TERM == xterm-kitty ]]; then fastfetch -c ~/.config/fastfetch/kitty.jsonc; else fastfetch; fi
-  fi
+  # system info banner: type "fetch" (the dashboard opens with it)
+  fetch() { if [[ $TERM == xterm-kitty ]]; then fastfetch -c ~/.config/fastfetch/kitty.jsonc; else fastfetch; fi; }
+  [[ -n ${CISA_FETCH:-} ]] && command -v fastfetch >/dev/null && { fetch; unset CISA_FETCH; }
   command -v starship >/dev/null && eval "$(starship init bash)"
 fi
 # <<< cisa-rice <<<
@@ -267,8 +268,9 @@ reload_hypr() {
   hyprctl reload >/dev/null 2>&1 || true
   pkill -x swaybg 2>/dev/null || true
   setsid -f swaybg -i "$CUR/wallpaper.png" -m fill >/dev/null 2>&1
-  # reload Waybar's config and style in place (the session's restart loop keeps it alive)
-  if pgrep -x waybar >/dev/null; then pkill -USR2 -x waybar; else setsid -f waybar >/dev/null 2>&1; fi
+  # reload Waybar's config and style in place; cisa-bar (started by Hyprland) keeps it alive
+  if pgrep -x waybar >/dev/null; then pkill -USR2 -x waybar
+  elif ! pgrep -f bin/cisa-bar >/dev/null; then setsid -f cisa-bar >/dev/null 2>&1; fi
   swaync-client -rs >/dev/null 2>&1 || true
   hyprctl setcursor "$(theme_field "$THEME_ID" CURSOR)" 24 >/dev/null 2>&1 || true
   local errs; errs=$(hyprctl configerrors 2>/dev/null | grep -v '^$' || true)

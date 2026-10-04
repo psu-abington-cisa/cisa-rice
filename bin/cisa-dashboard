@@ -9,6 +9,6 @@ if [[ ${1:-} == --first-login ]]; then
 fi
 open() { hyprctl dispatch exec "$1" >/dev/null; sleep 0.6; }
 # dwindle tiling: 1st window fills, 2nd splits it side by side, 3rd splits the 2nd top/bottom
-open "kitty --class cisa-fetch"
+open "kitty --class cisa-fetch env CISA_FETCH=1 bash"
 open "kitty --class cisa-clock -e cisa-clock"
 open "kitty --class cisa-cal -e cisa-cal"

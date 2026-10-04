@@ -75,9 +75,9 @@ $browser = firefox-esr
 $menu = fuzzel
 
 # ---------- autostart
-# Waybar can exit if it starts before the session bus/portals are ready: restart it a few times.
-# (Theme changes reload it in place with SIGUSR2, so this never spawns duplicates.)
-exec-once = sh -c 'for i in 1 2 3 4 5 6; do waybar; sleep 2; done'
+# Waybar is supervised: restarted whenever it exits (it can fail very early in a session),
+# logged to $XDG_RUNTIME_DIR/waybar.log. Theme changes reload it in place with SIGUSR2.
+exec-once = cisa-bar
 exec-once = swaync
 exec-once = swaybg -i {d}/wallpaper.png -m fill
 exec-once = hypridle
@@ -183,8 +183,8 @@ source = ~/.config/hypr/user.conf
 BINDS = """# CISA Rice key bindings (Super = the Windows key). Super+/ shows this list on screen.
 $mod = SUPER
 
-bindr = $mod, SUPER_L, exec, pkill fuzzel || fuzzel
-bind = $mod, SPACE, exec, pkill fuzzel || fuzzel
+bindr = $mod, SUPER_L, exec, cisa-menu
+bind = $mod, SPACE, exec, cisa-menu
 bind = $mod, RETURN, exec, kitty
 bind = $mod, T, exec, kitty
 bind = $mod, E, exec, dolphin
@@ -268,8 +268,9 @@ windowrule = float on, match:class ^(org.kde.polkit-kde-authentication-agent-1|h
 windowrule = float on, match:title ^(Picture-in-Picture)$
 windowrule = suppress_event maximize, match:class .*
 
-layerrule = blur on, match:namespace ^(waybar|swaync-control-center|swaync-notification-window|launcher|logout_dialog)$
-layerrule = ignore_alpha 0.3, match:namespace ^(waybar|swaync-control-center|swaync-notification-window|launcher|logout_dialog)$
+layerrule = blur on, match:namespace ^(waybar|swaync-control-center|swaync-notification-window|launcher|logout_dialog|cisa-menu)$
+layerrule = ignore_alpha 0.36, match:namespace ^(waybar|swaync-control-center|swaync-notification-window|launcher|logout_dialog|cisa-menu)$
+layerrule = animation popin 94%, match:namespace ^(cisa-menu|launcher)$
 """
 
 
@@ -368,189 +369,296 @@ listener {
 """}
 
 
+# --------------------------------------------------------------------------- shared surfaces
+
+def surface(t):
+    """One visual language for every floating surface (bar islands, menu card, launcher):
+    background, border, shadow, radius and text colours per style."""
+    s = t["STYLE"]
+    if s == "glass":
+        return dict(bg="rgba(16, 22, 44, 0.42)", bg_solid="rgba(16,22,44,0.92)", border="rgba(255, 255, 255, 0.22)",
+                    sheen="linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02) 60%)",
+                    shadow="0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25)", radius=16,
+                    fg="#ffffff", muted="rgba(255,255,255,0.62)", hover="rgba(255,255,255,0.12)",
+                    active="rgba(255,255,255,0.20)", field="rgba(255,255,255,0.10)", bw=1)
+    if s == "oled":
+        return dict(bg="#000000", bg_solid="#000000", border=t["LINE"], sheen="none", shadow="none", radius=10,
+                    fg=t["FG"], muted=t["MUTED"], hover="#0b0e13", active="#12161d", field="#07090c", bw=1)
+    if s == "blueprint":
+        return dict(bg="rgba(5, 5, 5, 0.86)", bg_solid="#050505", border="rgba(255,255,255,0.85)", sheen="none",
+                    shadow="none", radius=0, fg="#f2f2f2", muted="#8a8a8a", hover="rgba(255,255,255,0.08)",
+                    active="#f2f2f2", field="rgba(255,255,255,0.05)", bw=1)
+    dark = t["DARK"]
+    return dict(bg=rgba(t["SURFACE"], .86 if dark else .9), bg_solid=t["SURFACE"],
+                border=rgba(t["FG"], .12 if dark else .14), sheen="none",
+                shadow=f"0 8px 24px {rgba('#000000', .32 if dark else .10)}", radius=min(max(t['RADIUS'], 8), 14),
+                fg=t["FG"], muted=t["MUTED"], hover=rgba(t["FG"], .07), active=rgba(t["FG"], .12),
+                field=rgba(t["FG"], .06 if dark else .05), bw=1)
+
+
 # --------------------------------------------------------------------------- Waybar
 
 def waybar(t, d):
+    """Minimal bar: three floating islands. Left: CISA mark (menu) + workspace dots.
+    Centre: clock. Right: lab VPN, network, volume, battery, tray, power."""
     cfg = {
-        "layer": "top", "position": "top", "height": 34, "spacing": 4, "margin-top": 6, "margin-left": 10,
-        "margin-right": 10,
-        "modules-left": ["custom/power", "custom/apps", "custom/theme", "group/system", "temperature", "hyprland/window"],
-        "modules-center": ["hyprland/workspaces"],
-        "modules-right": ["tray", "custom/vpn", "pulseaudio", "network", "battery", "clock"],
-        "group/system": {"orientation": "horizontal", "modules": ["cpu", "memory", "disk"]},
-        "custom/power": {"format": I["power"], "tooltip-format": "Power menu (Super+X)", "on-click": "cisa-power"},
-        "custom/apps": {"format": I["apps"], "tooltip-format": "Apps (Super)", "on-click": "fuzzel"},
-        "custom/theme": {"format": I["brush"], "tooltip-format": "Change theme (Super+Shift+T)", "on-click": "cisa-theme"},
-        "cpu": {"format": "{usage}% " + I["cpu"], "interval": 3, "on-click": "kitty -e btop"},
-        "memory": {"format": "{percentage}% " + I["mem"], "interval": 5, "on-click": "kitty -e btop"},
-        "disk": {"format": "{percentage_used}% " + I["disk"], "path": "/", "on-click": "kitty -e btop"},
-        "temperature": {"format": "{temperatureC}°C " + I["temp"], "critical-threshold": 85, "on-click": "kitty -e btop"},
-        "hyprland/window": {"format": "{title}", "max-length": 42, "separate-outputs": True,
-                            "rewrite": {"(.*) — Mozilla Firefox": "$1", "": ""}},
+        "layer": "top", "position": "top", "height": 34, "spacing": 0,
+        "margin-top": 8, "margin-left": 12, "margin-right": 12, "reload_style_on_change": True,
+        "modules-left": ["group/start"],
+        "modules-center": ["clock"],
+        "modules-right": ["group/status"],
+        "group/start": {"orientation": "horizontal", "modules": ["image#logo", "hyprland/workspaces"]},
+        "group/status": {"orientation": "horizontal",
+                         "modules": ["custom/vpn", "network", "pulseaudio", "battery", "tray", "custom/power"]},
+        "image#logo": {"path": f"{d}/icon.png", "size": 20, "on-click": "cisa-menu",
+                       "tooltip": False},
         "hyprland/workspaces": {"format": "{name}", "on-click": "activate", "sort-by-number": True,
                                 "persistent-workspaces": {"*": 5}},
-        "tray": {"spacing": 10, "icon-size": 15},
-        "custom/vpn": {"exec": "cisa-vpn", "return-type": "json", "interval": 5, "on-click": "cisa-vpn --copy",
-                       "tooltip": True},
-        "pulseaudio": {"format": "{volume}% {icon}", "format-muted": I["mute"] + " muted",
-                       "format-icons": {"default": [I["mute"], I["vol"], I["vol"]]},
-                       "on-click": "pavucontrol-qt", "scroll-step": 5},
-        "network": {"format-wifi": "{essid} {signalStrength}% " + I["wifi"], "format-ethernet": "{ipaddr} " + I["eth"],
-                    "format-disconnected": "offline " + I["off"], "tooltip-format": "{ifname}  {ipaddr}/{cidr}  via {gwaddr}",
-                    "on-click": "nm-connection-editor"},
-        "battery": {"format": "{capacity}% {icon}", "format-charging": "{capacity}% " + I["plug"],
-                    "format-icons": I["bat"], "states": {"warning": 30, "critical": 15}},
-        "clock": {"format": "{:%a %d  %H:%M}", "tooltip-format": "<tt>{calendar}</tt>",
+        "clock": {"format": "{:%a %d %b   %H:%M}", "tooltip-format": "<tt>{calendar}</tt>",
                   "calendar": {"mode": "month", "format": {"today": f"<span color='{t['ACCENT']}'><b>{{}}</b></span>"}},
                   "on-click": "kitty --class cisa-cal -e cisa-cal"},
+        "custom/vpn": {"exec": "cisa-vpn", "return-type": "json", "interval": 5, "on-click": "cisa-vpn --copy",
+                       "tooltip": True},
+        "network": {"format-wifi": I["wifi"], "format-ethernet": I["eth"], "format-disconnected": I["off"],
+                    "tooltip-format": "{ifname}  {ipaddr}/{cidr}", "tooltip-format-wifi": "{essid}  {signalStrength}%  {ipaddr}",
+                    "on-click": "nm-connection-editor"},
+        "pulseaudio": {"format": "{icon}  {volume}", "format-muted": I["mute"],
+                       "format-icons": {"default": [I["mute"], I["vol"], I["vol"]]},
+                       "on-click": "pavucontrol-qt", "scroll-step": 5, "tooltip": False},
+        "battery": {"format": "{icon}  {capacity}", "format-charging": I["plug"] + "  {capacity}",
+                    "format-icons": I["bat"], "states": {"warning": 25, "critical": 12}},
+        "tray": {"spacing": 10, "icon-size": 14},
+        "custom/power": {"format": I["power"], "tooltip": False, "on-click": "cisa-power"},
     }
     return {"waybar/config.jsonc": "// CISA Rice Waybar (generated)\n" + json.dumps(cfg, indent=2, ensure_ascii=False),
             "waybar/style.css": waybar_css(t)}
 
 
 def waybar_css(t):
-    s, r = t["STYLE"], min(t["RADIUS"], 8) if t["RADIUS"] else 0
-    fg, bg = t["FG"], t["BG"]
-    # filled modules use the 30% "panel" colour; outlined ones sit on the ground colour
-    if s == "glass":
-        fill_bg, fill_fg = "rgba(255, 255, 255, 0.16)", "#ffffff"
-        line_bg, line_border, line_fg = "rgba(255, 255, 255, 0.07)", "rgba(255, 255, 255, 0.32)", "#ffffff"
-        sheen = "background-image: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.04) 55%, rgba(255,255,255,0.0) 100%);"
-        shadow = "box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 14px rgba(0,0,0,0.25);"
-        r = 12
-    elif s == "oled":
-        fill_bg, fill_fg = "#000000", fg
-        line_bg, line_border, line_fg = "#000000", t["LINE"], fg
-        sheen, shadow = "", ""
-    elif s == "blueprint":
-        fill_bg, fill_fg = "rgba(255, 255, 255, 0.88)", "#000000"
-        line_bg, line_border, line_fg = "rgba(0, 0, 0, 0.45)", "#ffffff", "#ffffff"
-        sheen, shadow = "", ""
-        r = 5
-    else:
-        fill_bg, fill_fg = rgba(t["PANEL"], .92), on(t["PANEL"]) if t["DARK"] else "#ffffff"
-        line_bg, line_border, line_fg = rgba(bg, .72), rgba(fg, .75), fg
-        sheen, shadow = "", "box-shadow: 0 2px 8px rgba(0,0,0,0.18);" if t["DARK"] else ""
-    border_w = 1 if s in ("oled", "glass") else 2
-    return f"""/* CISA Rice Waybar style: {t['NAME']} ({s}) */
+    S = surface(t)
+    r = S["radius"]
+    acc = t["ACCENT"] if t["STYLE"] != "blueprint" else "#f2f2f2"
+    sheen = f"background-image: {S['sheen']};" if S["sheen"] != "none" else ""
+    shadow = f"box-shadow: {S['shadow']};" if S["shadow"] != "none" else ""
+    return f"""/* CISA Rice Waybar: {t['NAME']} ({t['STYLE']}). Three floating islands. */
 * {{
     font-family: "{FONT}", "{ICON_FONT}", sans-serif;
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 600;
     min-height: 0;
     border: none;
     border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
 }}
+window#waybar {{ background: transparent; color: {S['fg']}; }}
+tooltip {{ background: {S['bg_solid']}; border: 1px solid {S['border']}; border-radius: {r}px; }}
+tooltip label {{ color: {S['fg']}; font-weight: 500; padding: 2px 4px; }}
 
-window#waybar {{ background: transparent; color: {fg}; }}
-tooltip {{ background: {bg if s != 'glass' else 'rgba(20,27,51,0.92)'}; border: {border_w}px solid {line_border}; border-radius: {r}px; }}
-tooltip label {{ color: {fg}; font-weight: normal; }}
-
-/* filled modules */
-#custom-power, #custom-apps, #custom-theme, #system, #temperature, #tray, #pulseaudio {{
-    background-color: {fill_bg};
+/* islands */
+#start, #clock, #status {{
+    background-color: {S['bg']};
     {sheen}
-    color: {fill_fg};
+    border: {S['bw']}px solid {S['border']};
     border-radius: {r}px;
-    padding: 2px 11px;
-    margin: 4px 1px;
     {shadow}
-    {'border: 1px solid ' + line_border + ';' if s in ('oled', 'glass') else ''}
+    margin: 0 2px;
 }}
-#custom-power {{ padding: 2px 12px 2px 11px; }}
-#system {{ padding: 0 4px; }}
-#cpu, #memory, #disk {{ color: {fill_fg}; padding: 0 7px; }}
-#tray menu {{ background: {bg}; color: {fg}; }}
+#start {{ padding: 0 8px 0 12px; }}
+#status {{ padding: 0 6px; }}
+#clock {{ padding: 0 18px; color: {S['fg']}; letter-spacing: 1px; }}
 
-/* outlined modules */
-#window, #network, #battery, #clock, #custom-vpn {{
-    background-color: {line_bg};
-    {sheen if s == 'glass' else ''}
-    color: {line_fg};
-    border: {border_w}px solid {line_border};
-    border-radius: {r}px;
-    padding: 1px 11px;
-    margin: 4px 1px;
-    {shadow if s == 'glass' else ''}
-}}
-#window {{ margin-left: 10px; font-weight: normal; }}
-window#waybar.empty #window {{ background: transparent; border-color: transparent; }}
-#clock {{ border-color: {t['ACCENT'] if s == 'solid' else line_border}; }}
+/* CISA mark opens the menu */
+#image.logo {{ padding: 0 10px 0 0; }}
 
-/* VPN to the training labs: lit in the accent colour when tun0 is up */
-#custom-vpn.on {{ background-color: {t['ACCENT']}; color: {on(t['ACCENT'])}; border-color: {t['ACCENT']}; }}
-#custom-vpn.off {{ color: {t['MUTED']}; }}
-
-/* workspaces: pill buttons, the active one stretches (like the reference rice) */
-#workspaces {{
-    background-color: {'rgba(255,255,255,0.10)' if s == 'glass' else ('#000000' if s == 'oled' else rgba(fg, .14))};
-    {'border: 1px solid ' + line_border + ';' if s in ('oled', 'glass') else ''}
-    border-radius: {r}px;
-    padding: 3px 4px;
-    margin: 4px 0;
-}}
+/* workspaces: 8px dots (34px bar - 2px border - 2x12px margin), the active one stretches into a pill */
+#workspaces {{ padding: 0 2px; }}
 #workspaces button {{
-    min-width: 12px;
-    padding: 0 4px;
-    margin: 2px 3px;
+    min-width: 8px;
+    min-height: 8px;
+    padding: 0;
+    margin: 12px 4px;
+    font-size: 0;
     color: transparent;
-    font-size: 1px;
-    background-color: {rgba(fg, .28) if s != 'oled' else t['LINE']};
-    border-radius: {max(r - 2, 0)}px;
-    transition: all 0.15s ease-in-out;
+    background-color: {rgba(S['fg'] if S['fg'].startswith('#') else '#ffffff', .30)};
+    border-radius: 999px;
+    transition: all 0.2s ease-in-out;
 }}
-#workspaces button:hover {{ background-color: {rgba(fg, .6)}; padding: 0 8px; }}
-#workspaces button.active {{ background-color: {t['ACCENT'] if s != 'blueprint' else '#d8d9db'}; padding: 0 22px; }}
+#workspaces button.empty {{ background-color: {rgba(S['fg'] if S['fg'].startswith('#') else '#ffffff', .14)}; }}
+#workspaces button:hover {{ background-color: {rgba(S['fg'] if S['fg'].startswith('#') else '#ffffff', .6)}; }}
+#workspaces button.active {{ min-width: 26px; background-color: {acc}; }}
 #workspaces button.urgent {{ background-color: {t['RED']}; }}
 
-#battery.warning:not(.charging) {{ color: {t['YELLOW']}; border-color: {t['YELLOW']}; }}
-@keyframes blink {{ to {{ background-color: {t['RED']}; color: #ffffff; }} }}
-#battery.critical:not(.charging) {{ animation: blink 0.6s steps(12) infinite alternate; }}
-#temperature.critical {{ background-color: {t['RED']}; color: #ffffff; }}
-#pulseaudio.muted {{ background-color: {rgba(t['MUTED'], .6)}; color: {fg}; }}
-#network.disconnected {{ color: {t['RED']}; border-color: {t['RED']}; }}
+/* status icons */
+#custom-vpn, #network, #pulseaudio, #battery, #tray, #custom-power {{
+    padding: 0 10px;
+    color: {S['fg']};
+    border-radius: {max(r - 6, 0)}px;
+    margin: 5px 0;
+}}
+#network:hover, #pulseaudio:hover, #custom-power:hover, #custom-vpn:hover {{ background-color: {S['hover']}; }}
+#custom-power {{ color: {S['muted']}; }}
+#custom-power:hover {{ color: {t['RED']}; }}
+#pulseaudio.muted, #network.disconnected {{ color: {S['muted']}; }}
+#battery.warning:not(.charging) {{ color: {t['YELLOW']}; }}
+#battery.critical:not(.charging) {{ color: {t['RED']}; }}
+#tray menu {{ background: {S['bg_solid']}; color: {S['fg']}; border: 1px solid {S['border']}; }}
+
+/* lab VPN: a dim shield when off; an accent pill with your IP when connected */
+#custom-vpn.off {{ color: {S['muted']}; }}
+#custom-vpn.on {{ background-color: {acc}; color: {on(acc)}; margin: 5px 4px; padding: 0 12px; }}
 """
 
 
 # --------------------------------------------------------------------------- launcher, power menu, notifications
 
 def fuzzel(t, d):
+    """fuzzel is used for small pickers (shortcuts, clipboard, themes); styled like the menu card."""
     s = t["STYLE"]
     a = lambda h, al: h.lstrip("#") + f"{round(al * 255):02x}"
-    bg_alpha = {"glass": .55, "oled": 1.0, "blueprint": .8}.get(s, .94)
-    return {"fuzzel/fuzzel.ini": f"""# CISA Rice launcher ({t['NAME']})
+    S = surface(t)
+    bg = {"glass": a("#10162c", .88), "oled": a("#000000", 1), "blueprint": a("#050505", .96)}.get(s, a(t["SURFACE"], .97))
+    fg = "#ffffff" if s == "glass" else ("#f2f2f2" if s == "blueprint" else t["FG"])
+    border = {"glass": a("#ffffff", .22), "oled": a(t["LINE"], 1), "blueprint": a("#ffffff", .85)}.get(s, a(t["FG"], .14))
+    sel = {"glass": a("#ffffff", .14), "oled": a("#12161d", 1), "blueprint": a("#f2f2f2", 1)}.get(s, a(t["FG"], .10))
+    return {"fuzzel/fuzzel.ini": f"""# CISA Rice pickers ({t['NAME']}), styled like the CISA menu
 [main]
-font={FONT}:size=13,{ICON_FONT}:size=13
-prompt="{I['search']}  "
-placeholder=Search apps
+font={FONT}:size=12,{ICON_FONT}:size=12
+prompt="{I['search']}   "
+placeholder=Search
 icon-theme={t['ICONS']}
 icons-enabled=yes
 terminal=kitty -e
 layer=overlay
-width=46
-lines=8
-horizontal-pad=22
-vertical-pad=18
-inner-pad=10
-line-height=26
-letter-spacing=0
+anchor=top
+y-margin=64
+width=56
+lines=10
+horizontal-pad=24
+vertical-pad=20
+inner-pad=14
+line-height=28
 image-size-ratio=0.5
 
 [colors]
-background={a(t['BG'], bg_alpha)}
-text={a(t['FG'], 1)}
-prompt={a(t['FG'], 1)}
+background={bg}
+text={a(fg, .92)}
+prompt={a(t['MUTED'] if s != 'glass' else '#ffffff', 1)}
 placeholder={a(t['MUTED'], 1)}
-input={a(t['FG'], 1)}
-match={a(t['ACCENT'], 1)}
-selection={a('#ffffff' if s == 'blueprint' else (t['PANEL'] if s != 'glass' else '#ffffff'), .92 if s != 'glass' else .22)}
-selection-text={a('#000000' if s == 'blueprint' else (t['BG'] if s != 'glass' else '#ffffff'), 1)}
-selection-match={a(t['ACCENT_ON_PANEL'] if s not in ('glass', 'blueprint') else t['ACCENT'], 1)}
-border={a('#ffffff' if s in ('glass', 'blueprint') else t['FG'], .55 if s == 'glass' else (.35 if s == 'oled' else 1))}
+input={a(fg, 1)}
+match={a(t['ACCENT'] if s != 'blueprint' else '#ffffff', 1)}
+selection={sel}
+selection-text={a('#050505' if s == 'blueprint' else fg, 1)}
+selection-match={a(t['ACCENT'] if s != 'blueprint' else '#000000', 1)}
+border={border}
 
 [border]
-width={1 if s in ('oled', 'glass') else 2}
-radius={t['RADIUS'] if s != 'blueprint' else 8}
+width=1
+radius={S['radius']}
+"""}
+
+
+def menu(t, d):
+    """Stylesheet for cisa-menu (bin/cisa-menu), the start menu / app launcher."""
+    S = surface(t)
+    s, r = t["STYLE"], S["radius"]
+    fg = S["fg"]
+    acc = t["ACCENT"] if s != "blueprint" else "#f2f2f2"
+    card_bg = {"glass": "rgba(16, 22, 44, 0.62)", "oled": "#000000", "blueprint": "#050505"}.get(s, rgba(t["SURFACE"], .97))
+    backdrop = {"oled": "rgba(0,0,0,0.65)", "glass": "rgba(0,0,0,0.18)"}.get(s, "rgba(0,0,0,0.32)" if t["DARK"] else "rgba(10,20,40,0.18)")
+    sheen = f"background-image: {S['sheen']};" if S["sheen"] != "none" else ""
+    shadow = "box-shadow: 0 24px 60px rgba(0,0,0,0.45);" if s not in ("oled", "blueprint") else ""
+    tile_r = max(r - 4, 0)
+    return {"cisa-menu/style.css": f"""/* CISA menu ({t['NAME']}, {s}) - generated by CISA Rice */
+* {{ font-family: "{FONT}", sans-serif; }}
+window.backdrop {{ background-color: {backdrop}; }}
+
+.card {{
+    background-color: {card_bg};
+    {sheen}
+    border: 1px solid {S['border']};
+    border-radius: {r + 4 if r else 0}px;
+    padding: 22px 24px 14px 24px;
+    {shadow}
+    color: {fg};
+}}
+
+.header {{ margin-bottom: 18px; }}
+.greeting {{ font-size: 17px; font-weight: 700; color: {fg}; }}
+.sub {{ font-size: 11px; color: {S['muted']}; }}
+
+entry.search {{
+    background-color: {S['field']};
+    background-image: none;
+    color: {fg};
+    caret-color: {acc};
+    border: 1px solid {S['border']};
+    border-radius: {max(r - 2, 0)}px;
+    padding: 10px 14px;
+    min-height: 22px;
+    font-size: 13px;
+    box-shadow: none;
+}}
+entry.search:focus {{ border-color: {acc}; }}
+entry.search image {{ color: {S['muted']}; }}
+
+.section {{
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: {S['muted']};
+    margin: 20px 4px 10px 4px;
+}}
+
+button {{ background-image: none; box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; }}
+
+.tile {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: {tile_r}px;
+    padding: 12px 4px 10px 4px;
+    color: {fg};
+    font-size: 11px;
+    transition: all 120ms ease-out;
+}}
+.tile:hover {{ background-color: {S['hover']}; border-color: {S['border']}; }}
+.tile:active {{ background-color: {S['active']}; }}
+
+.chip {{
+    background-color: {S['field']};
+    border: 1px solid {S['border']};
+    border-radius: 999px;
+    padding: 6px 16px;
+    color: {fg};
+    font-size: 12px;
+    font-weight: 600;
+}}
+.chip:hover {{ border-color: {acc}; color: {acc}; }}
+
+list.results, list.results row {{ background-color: transparent; }}
+.row {{ border-radius: {tile_r}px; padding: 8px 12px; margin: 1px 0; color: {fg}; }}
+.row:selected, .row:hover {{ background-color: {S['active']}; }}
+.row:selected .name {{ color: {acc if s != 'blueprint' else '#050505'}; }}
+{'.row:selected { background-color: #f2f2f2; } .row:selected .desc { color: #3a3a3a; }' if s == 'blueprint' else ''}
+.name {{ font-size: 13px; font-weight: 600; }}
+.desc {{ font-size: 11px; color: {S['muted']}; }}
+scrollbar {{ background: transparent; border: none; }}
+scrollbar slider {{ background-color: {S['border']}; border-radius: 999px; min-width: 4px; }}
+
+.footer {{ border-top: 1px solid {S['border']}; margin-top: 18px; padding-top: 10px; }}
+.who {{ font-size: 11px; color: {S['muted']}; }}
+.icon-btn {{
+    background-color: transparent;
+    border: none;
+    border-radius: {max(r - 4, 0)}px;
+    padding: 7px;
+    color: {S['muted']};
+    min-width: 0;
+    min-height: 0;
+}}
+.icon-btn:hover {{ background-color: {S['hover']}; color: {fg}; }}
+tooltip {{ background-color: {S['bg_solid']}; border: 1px solid {S['border']}; border-radius: 8px; }}
+tooltip label {{ color: {fg}; }}
 """}
 
 
@@ -640,33 +748,55 @@ def swaync(t, d):
 def kitty(t, d):
     c = term_colors(t)
     colors = "\n".join(f"color{i} {v}" for i, v in enumerate(c))
+    sel_bg = mix(t["BG"], t["ACCENT"], 30)
     return {"kitty/kitty.conf": f"""# CISA Rice terminal ({t['NAME']})
 font_family      {FONT}
-bold_font        auto
-font_size        11.5
-disable_ligatures never
+bold_font        {FONT} Bold
+italic_font      auto
+font_size        11
+modify_font      cell_height 118%
+disable_ligatures cursor
 
 background            {t['BG']}
 foreground            {t['FG']}
 background_opacity    {t['TERM_OPACITY']}
+background_blur       0
+dim_opacity           0.8
 cursor                {t['ACCENT']}
-cursor_text_color     {t['BG']}
-cursor_shape          block
-selection_background  {t['ACCENT']}
-selection_foreground  {on(t['ACCENT'])}
+cursor_text_color     background
+cursor_shape          beam
+cursor_beam_thickness 1.6
+cursor_blink_interval 0.6
+cursor_stop_blinking_after 8
+cursor_trail          3
+cursor_trail_decay    0.08 0.28
+selection_background  {sel_bg}
+selection_foreground  none
 url_color             {t['ACCENT2']}
+url_style             curly
 {colors}
 
-window_padding_width  15
+window_padding_width  14 20
+placement_strategy    top-left
 hide_window_decorations yes
 confirm_os_window_close 0
-enable_audio_bell no
-tab_bar_style         powerline
-tab_powerline_style   slanted
-active_tab_background {t['ACCENT']}
-active_tab_foreground {on(t['ACCENT'])}
-inactive_tab_background {t['SURFACE']}
+enable_audio_bell     no
+scrollback_lines      10000
+mouse_hide_wait       2.0
+
+# minimal tabs: only shown when there is more than one
+tab_bar_edge          bottom
+tab_bar_style         separator
+tab_separator         "  "
+tab_bar_min_tabs      2
+tab_title_template    " {{index}}  {{title[:24]}} "
+active_tab_foreground   {t['ACCENT']}
+active_tab_background   {t['BG']}
+active_tab_font_style   bold
 inactive_tab_foreground {t['MUTED']}
+inactive_tab_background {t['BG']}
+tab_bar_background      {t['BG']}
+
 shell_integration     enabled no-cursor
 allow_remote_control  socket-only
 listen_on             unix:@kitty-{{kitty_pid}}
@@ -762,11 +892,13 @@ def fastfetch(t, d):
 
 
 def starship(t, d):
-    return {"starship.toml": f"""# CISA Rice prompt ({t['NAME']}). Shows your lab VPN IP when tun0 is up.
+    return {"starship.toml": f"""# CISA Rice prompt ({t['NAME']}): minimal. Directory + git on the left;
+# lab VPN IP and slow-command time on the right. user@host only shows over SSH or as root.
 add_newline = true
 palette = "cisa"
-format = \"\"\"[┌](muted)[\\\\[](muted)$username[@](muted)$hostname[\\\\]](muted)[─](muted)[\\\\[](muted)$directory[\\\\]](muted)$git_branch$git_status$python${{custom.vpn}}$cmd_duration
-[└](muted)$character\"\"\"
+format = "$username$hostname$directory$git_branch$git_status$python$character"
+right_format = "${{custom.vpn}}$cmd_duration"
+continuation_prompt = "[·](muted) "
 
 [palettes.cisa]
 accent = "{t['ACCENT']}"
@@ -778,48 +910,53 @@ warn = "{t['YELLOW']}"
 muted = "{t['MUTED']}"
 
 [username]
-show_always = true
-style_user = "bold accent"
+show_always = false
+style_user = "muted"
 style_root = "bold bad"
 format = "[$user]($style)"
 
 [hostname]
-ssh_only = false
-style = "bold fg"
-format = "[$hostname]($style)"
+ssh_only = true
+style = "muted"
+format = "[@$hostname]($style) "
 
 [directory]
-style = "bold accent2"
-truncation_length = 4
+style = "bold fg"
+truncation_length = 3
+truncation_symbol = "…/"
+home_symbol = "~"
 read_only = " ro"
-format = "[$path]($style)[$read_only]($read_only_style)"
+read_only_style = "muted"
+format = "[$path]($style)[$read_only]($read_only_style) "
 
 [git_branch]
-style = "bold warn"
-format = " [$branch]($style)"
+symbol = ""
+style = "accent2"
+format = "[$branch]($style) "
 
 [git_status]
-style = "warn"
-format = "[ $all_status$ahead_behind]($style)"
+style = "muted"
+format = "[$all_status$ahead_behind]($style) "
 
 [python]
-style = "warn"
-format = " [py $version]($style)"
+style = "muted"
+format = "[py $version]($style) "
 
 [cmd_duration]
+min_time = 3000
 style = "muted"
-format = " [$duration]($style)"
+format = "[$duration]($style)"
 
 [character]
-success_symbol = "[\\\\$](bold accent)"
-error_symbol = "[\\\\$](bold bad)"
+success_symbol = "[❯](bold accent)"
+error_symbol = "[❯](bold bad)"
 
 [custom.vpn]
 command = "ip -4 -o addr show tun0 | awk '{{print $4}}' | cut -d/ -f1"
 when = "ip link show tun0"
 shell = ["bash", "--noprofile", "--norc"]
 style = "bold good"
-format = " [vpn $output]($style)"
+format = "[vpn $output]($style)  "
 """}
 
 
@@ -868,4 +1005,4 @@ def konsole(t):
     return "\n".join(out)
 
 
-ALL = (hyprland, hyprlock, hypridle, waybar, fuzzel, wlogout, swaync, kitty, btop, cava, fastfetch, starship)
+ALL = (hyprland, hyprlock, hypridle, waybar, fuzzel, menu, wlogout, swaync, kitty, btop, cava, fastfetch, starship)

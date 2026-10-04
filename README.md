@@ -27,7 +27,9 @@ Everything comes from Debian. Hyprland, hyprlock and hypridle are installed from
 | ![Volt](screenshots/volt.jpg) **Volt**: violet and chartreuse | ![Daylight](screenshots/daylight.jpg) **Daylight**: light, blue and orange | ![OLED](screenshots/oled.jpg) **OLED**: true black, no glow |
 | ![Glass](screenshots/glass.jpg) **Glass**: glossy frosted glass | ![Blueprint](screenshots/blueprint.jpg) **Blueprint**: monochrome engineering drawing | ![Phosphor](screenshots/phosphor.jpg) **Phosphor**: CRT terminal green |
 
-![Power menu and lock screen](screenshots/ui.jpg)
+| The CISA menu | Power menu and lock screen |
+|---|---|
+| ![The CISA menu](screenshots/menu.jpg) | ![Power menu and lock screen](screenshots/ui.jpg) |
 
 Signal, Reef, Volt, Daylight and OLED use the palettes, the **ci** mark, the **cisa** wordmark and the
 seal from the CISA logo concepts. The badge is redrawn as a pure vector
@@ -36,13 +38,17 @@ seal from the CISA logo concepts. The badge is redrawn as a pure vector
 ## What you get
 
 - **Hyprland:** tiling windows with gaps, borders and blur, plus smooth animations.
-- **Waybar:** boxed monospace modules (power, apps, theme, CPU/RAM/disk, temperature, window title,
-  workspaces, tray, volume, network, battery, clock). There's also a **VPN module** that lights up
-  with your TryHackMe/OffSec `tun0` IP; click it to copy the IP for `LHOST`.
-- **Launcher, power menu and notifications:** fuzzel, wlogout and swaync, all matching the theme.
+- **A minimal bar:** three floating islands. On the left are the CISA mark (opens the menu) and workspace dots.
+  The middle has the clock. On the right are icons for the lab VPN, network, volume, battery, tray and power. The
+  **VPN icon** lights up with your TryHackMe/OffSec `tun0` IP; click it to copy the IP for `LHOST`.
+- **The CISA menu:** a themed start menu with a greeting, search, pinned apps with real tool icons,
+  CISA tool categories (Recon, Web, Passwords, Exploit, Forensics, Reverse) and power buttons. Press **Super**,
+  type, then press Enter.
+- **Power menu and notifications:** wlogout and swaync, matching the theme.
 - **Lock screen:** hyprlock with a big clock, plus hypridle (locks after 5 minutes).
-- **Terminal:** kitty with fastfetch showing the CISA mark (sharp, via the kitty image protocol), and a
-  starship prompt that shows your VPN IP.
+- **Terminal:** kitty with a minimal prompt (`~/folder  branch  ❯`, with the VPN IP and slow-command time on
+  the right), a beam cursor with a soft trail, and tabs that only appear when you open a second one. Type
+  `fetch` for system info with the CISA mark (sharp, via the kitty image protocol).
 - **TUI apps:** btop, cava, a big clock and a calendar, all themed. **Super+D** opens the dashboard
   (system info, clock and calendar, tiled).
 - **Plasma:** gets the same colors, wallpaper, lock screen, login screen and Konsole colors.
@@ -75,7 +81,8 @@ seal from the CISA logo concepts. The badge is redrawn as a pure vector
 ```
 
 Your own Hyprland tweaks go in `~/.config/hypr/user.conf`. CISA Rice never overwrites that file.
-Set `export CISA_NO_FETCH=1` in `~/.bashrc` to skip the terminal banner.
+To change the menu's pinned apps, put one `.desktop` id per line in `~/.config/cisa-menu/pinned`.
+If the top bar ever misbehaves, `$XDG_RUNTIME_DIR/waybar.log` says why.
 
 ## Make your own theme
 
@@ -100,7 +107,7 @@ ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"
 | `lib/render.py` | renders every config and the artwork for a theme |
 | `lib/configs.py` | Hyprland, Waybar, fuzzel, wlogout, swaync, kitty, btop, cava, fastfetch, starship, KDE |
 | `lib/art.py` | marks, seal and wallpapers (SVG, rendered at 4K) |
-| `bin/` | `cisa-theme`, `cisa-keys`, `cisa-dashboard`, `cisa-cal`, `cisa-clock`, `cisa-power`, `cisa-vpn`, `cisa-shot`, `cisa-clip` |
+| `bin/` | `cisa-menu` (start menu), `cisa-bar` (keeps Waybar running), `cisa-theme`, `cisa-keys`, `cisa-dashboard`, `cisa-cal`, `cisa-clock`, `cisa-power`, `cisa-vpn`, `cisa-shot`, `cisa-clip` |
 | `dev/vm-test.sh` | boots CISA Linux in QEMU, installs, logs into Hyprland, screenshots every theme |
 
 Requires [CISA Linux](https://github.com/psu-abington-cisa/cisa-linux) or any Debian 13 system with KDE Plasma.
