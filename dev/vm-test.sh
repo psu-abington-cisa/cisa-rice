@@ -2,6 +2,7 @@
 # Boot the CISA Linux ISO in QEMU/KVM, copy this repo in, apply every theme as the live user,
 # and screenshot each one to dev/vm-shots/. Run as root inside WSL/Linux:
 #   bash dev/vm-test.sh [path/to/cisa-linux.iso] [theme ...]
+#   FROM_GITHUB=1 bash dev/vm-test.sh ...   # test the published curl | bash install instead of local files
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ISO="${1:-../cisa-linux/out/cisa-linux-2026.10-amd64.iso}"; shift || true
@@ -56,13 +57,23 @@ done
 sleep 15
 gexec 10 'pkill -f firefox-esr || true' >/dev/null 2>&1 || true
 
-echo "== uploading repo"
-tar czf "$T/repo.tgz" --exclude=dev/previews --exclude=dev/vm-shots .
-gexec 30 'mkdir -p /home/cisa/cisa-rice && tar xzf - -C /home/cisa/cisa-rice && chown -R cisa:cisa /home/cisa/cisa-rice && echo uploaded' "$T/repo.tgz"
+RICE=/home/cisa/cisa-rice/rice.sh
+if [[ ${FROM_GITHUB:-} == 1 ]]; then
+  # Exactly what students run (script(1) supplies the terminal that install.sh expects)
+  URL=https://raw.githubusercontent.com/psu-abington-cisa/cisa-rice/main/install.sh
+  echo "== installing from GitHub: $URL"
+  gexec 600 "$AS_USER script -qec 'curl -fsSL $URL | bash -s -- --theme ${THEMES[0]} --yes' /dev/null 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -14" \
+    || echo "  !! install from GitHub failed"
+  RICE=/home/cisa/.local/share/cisa-rice/app/rice.sh
+else
+  echo "== uploading repo"
+  tar czf "$T/repo.tgz" --exclude=dev/previews --exclude=dev/vm-shots --exclude=.git .
+  gexec 30 'mkdir -p /home/cisa/cisa-rice && tar xzf - -C /home/cisa/cisa-rice && chown -R cisa:cisa /home/cisa/cisa-rice && echo uploaded' "$T/repo.tgz"
+fi
 
 for th in "${THEMES[@]}"; do
   echo "== theme: $th"
-  gexec 600 "$AS_USER bash /home/cisa/cisa-rice/rice.sh --theme $th --yes 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -14" || echo "  !! rice.sh exited non-zero"
+  gexec 600 "$AS_USER bash $RICE --theme $th --yes 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -14" || echo "  !! rice.sh exited non-zero"
   gexec 10 'pkill -x konsole; pkill -x dolphin; true' >/dev/null 2>&1 || true
   sleep 3
   gexec 10 "$AS_USER setsid -f dolphin /home/cisa >/dev/null 2>&1; sleep 2; $AS_USER setsid -f konsole >/dev/null 2>&1; true" >/dev/null 2>&1 || true
@@ -71,6 +82,6 @@ for th in "${THEMES[@]}"; do
 done
 
 echo "== restore"
-gexec 120 "$AS_USER bash /home/cisa/cisa-rice/rice.sh --restore 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -5" || true
+gexec 120 "$AS_USER bash $RICE --restore 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tail -5" || true
 gexec 10 'pkill -x konsole; pkill -x dolphin; true' >/dev/null 2>&1 || true
 sleep 12; shot "restored"
