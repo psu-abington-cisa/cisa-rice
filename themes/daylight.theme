@@ -1,0 +1,10 @@
+# Bright and familiar: light theme modeled on Windows 11
+NAME="Daylight"
+DESC="Bright and familiar: a light theme like Windows 11"
+DARK=0
+BG="#f3f3f3"; SURFACE="#fbfbfb"; FG="#1b1b1f"; MUTED="#5f6368"
+ACCENT="#0067c0"; ACCENT2="#2b88d8"
+RED="#c42b1c"; GREEN="#0f7b0f"; YELLOW="#9d5d00"; BLUE="#0067c0"; MAGENTA="#8764b8"; CYAN="#007a87"
+ICONS="Papirus-Light"; CURSOR="Bibata-Modern-Classic"
+LAYOUT="win11"; FLOAT=1
+MOTIF="bloom"; TERM_OPACITY="0.97"

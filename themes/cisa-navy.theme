@@ -1,0 +1,10 @@
+# Official CISA colors (from cisa.cybernet.rocks)
+NAME="CISA Navy"
+DESC="Official CISA look: deep navy with Penn State blue"
+DARK=1
+BG="#0b1f3a"; SURFACE="#10284a"; FG="#e8edf5"; MUTED="#8494b0"
+ACCENT="#1d5fd6"; ACCENT2="#6ea8fe"
+RED="#ff6b7d"; GREEN="#3ddc97"; YELLOW="#ffc266"; BLUE="#6ea8fe"; MAGENTA="#c4a1ff"; CYAN="#5ad1e6"
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"
+LAYOUT="win10"; FLOAT=0
+MOTIF="badge"; TERM_OPACITY="0.95"

@@ -1,0 +1,10 @@
+# Calm and easy on the eyes: cool slate and ice blue (Nord-inspired)
+NAME="Arctic Frost"
+DESC="Calm and easy on the eyes: cool slate and ice blue"
+DARK=1
+BG="#2e3440"; SURFACE="#363d4b"; FG="#eceff4"; MUTED="#9aa3b5"
+ACCENT="#5e9fc4"; ACCENT2="#88c0d0"
+RED="#bf616a"; GREEN="#a3be8c"; YELLOW="#ebcb8b"; BLUE="#81a1c1"; MAGENTA="#b48ead"; CYAN="#8fbcbb"
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"
+LAYOUT="win10"; FLOAT=1
+MOTIF="mountains"; TERM_OPACITY="0.94"
