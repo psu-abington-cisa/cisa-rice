@@ -1,0 +1,11 @@
+# Phosphor: an old CRT terminal, black glass and phosphor green
+NAME="Phosphor"
+DESC="Old CRT terminal: black glass and phosphor green"
+DARK=1
+STYLE="solid"
+BG="#030a05"; SURFACE="#08140b"; PANEL="#9dffb0"; FG="#b8f5c4"; MUTED="#4f8a5c"; LINE="#16331d"
+ACCENT="#00e05a"; ACCENT2="#9dffb0"
+RED="#ff6b5f"; GREEN="#00e05a"; YELLOW="#d7ff5f"; BLUE="#5fd7af"; MAGENTA="#87ffaf"; CYAN="#5fffd7"
+MARK="ci"; MOTIF="phosphor"
+WIN_OPACITY="0.92"; TERM_OPACITY="0.82"; BLUR=1; RADIUS=4; BORDER=2; GAPS_IN=5; GAPS_OUT=12
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Classic"

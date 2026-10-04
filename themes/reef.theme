@@ -1,0 +1,11 @@
+# P2 from the CISA logo concepts: deep teal and coral
+NAME="Reef"
+DESC="Deep teal and coral, with the ci seal"
+DARK=1
+STYLE="solid"
+BG="#0d3438"; SURFACE="#124247"; PANEL="#cfeae6"; FG="#cfeae6"; MUTED="#91b0ae"; LINE="#476b6c"
+ACCENT="#f2664a"; ACCENT2="#ff9a85"
+RED="#ff6b6b"; GREEN="#7fd8a8"; YELLOW="#f2c86a"; BLUE="#7ab8d8"; MAGENTA="#e09ad0"; CYAN="#7fe0d6"
+MARK="ci"; MOTIF="seal"; ACCENT_ON_PANEL="#ee3611"
+WIN_OPACITY="0.95"; TERM_OPACITY="0.9"; BLUR=1; RADIUS=6; BORDER=2; GAPS_IN=5; GAPS_OUT=12
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"

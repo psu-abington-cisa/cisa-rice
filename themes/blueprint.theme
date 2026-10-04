@@ -1,0 +1,11 @@
+# Blueprint: monochrome, boxed and technical; the CISA shield drawn as an engineering drawing
+NAME="Blueprint"
+DESC="Monochrome and technical: the shield as an engineering drawing"
+DARK=1
+STYLE="blueprint"
+BG="#050505"; SURFACE="#101010"; PANEL="#f2f2f2"; FG="#f2f2f2"; MUTED="#8a8a8a"; LINE="#2a2a2a"
+ACCENT="#5fd7ff"; ACCENT2="#ffffff"
+RED="#ff6b6b"; GREEN="#7ad97a"; YELLOW="#ffcc66"; BLUE="#94dfff"; MAGENTA="#d7a8ff"; CYAN="#5fd7ff"
+MARK="ci"; MOTIF="blueprint"
+WIN_OPACITY="0.9"; TERM_OPACITY="0.72"; BLUR=1; RADIUS=0; BORDER=2; GAPS_IN=5; GAPS_OUT=10
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Classic"

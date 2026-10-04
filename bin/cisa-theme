@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pick a CISA Rice theme from a menu (Super+Shift+T) and apply it live.
+APP="$(cat "${XDG_DATA_HOME:-$HOME/.local/share}/cisa-rice/app-path" 2>/dev/null)"
+[[ -x $APP/rice.sh ]] || { notify-send -a CISA "CISA Rice not found" "Run the installer again."; exit 1; }
+current=$(cat "${XDG_DATA_HOME:-$HOME/.local/share}/cisa-rice/current-theme" 2>/dev/null)
+choice=$("$APP/rice.sh" --list | sed "s/^  \($current\) /  \1*/" |
+         fuzzel --dmenu --prompt "theme  " --width 64 --lines 9 --placeholder "pick a look") || exit 0
+id=$(awk '{print $1}' <<<"$choice" | tr -d '*')
+[[ -n $id ]] || exit 0
+notify-send -a CISA "Applying $id" "Give it a few seconds..."
+"$APP/rice.sh" --theme "$id" --yes --no-login-screen >/tmp/cisa-rice.log 2>&1 \
+  && notify-send -a CISA "Theme applied" "$id is on." \
+  || notify-send -a CISA -u critical "Theme failed" "See /tmp/cisa-rice.log"

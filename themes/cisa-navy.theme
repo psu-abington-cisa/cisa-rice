@@ -1,10 +1,11 @@
-# Official CISA colors (from cisa.cybernet.rocks)
+# CISA Navy: the club's own colors (cisa.cybernet.rocks) with the original badge
 NAME="CISA Navy"
-DESC="Official CISA look: deep navy with Penn State blue"
+DESC="Club colors: deep navy, Penn State blue, the CISA badge"
 DARK=1
-BG="#0b1f3a"; SURFACE="#10284a"; FG="#e8edf5"; MUTED="#8494b0"
+STYLE="solid"
+BG="#0b1f3a"; SURFACE="#10284a"; PANEL="#dce6f5"; FG="#e8edf5"; MUTED="#8494b0"; LINE="#1e3558"
 ACCENT="#1d5fd6"; ACCENT2="#6ea8fe"
 RED="#ff6b7d"; GREEN="#3ddc97"; YELLOW="#ffc266"; BLUE="#6ea8fe"; MAGENTA="#c4a1ff"; CYAN="#5ad1e6"
+MARK="badge"; MOTIF="badge"
+WIN_OPACITY="0.94"; TERM_OPACITY="0.88"; BLUR=1; RADIUS=10; BORDER=2; GAPS_IN=5; GAPS_OUT=12
 ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"
-LAYOUT="win10"; FLOAT=0
-MOTIF="badge"; TERM_OPACITY="0.95"

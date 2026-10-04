@@ -1,0 +1,11 @@
+# P1 from the CISA logo concepts: navy and signal orange (60/30/10, hue 216 vs 30)
+NAME="Signal"
+DESC="Navy and signal orange, with the ci seal"
+DARK=1
+STYLE="solid"
+BG="#0b1f3a"; SURFACE="#122a4a"; PANEL="#dce6f5"; FG="#dce6f5"; MUTED="#99a6b9"; LINE="#4a5b72"
+ACCENT="#f28c28"; ACCENT2="#ffb066"
+RED="#ff6b6b"; GREEN="#5fd3a5"; YELLOW="#f2c14e"; BLUE="#7fa8e8"; MAGENTA="#c7a0f0"; CYAN="#6fc8d8"
+MARK="ci"; MOTIF="seal"; ACCENT_ON_PANEL="#c2660c"
+WIN_OPACITY="0.95"; TERM_OPACITY="0.9"; BLUR=1; RADIUS=6; BORDER=2; GAPS_IN=5; GAPS_OUT=12
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"

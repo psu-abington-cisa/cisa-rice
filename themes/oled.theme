@@ -1,0 +1,11 @@
+# OLED black, from the CISA logo concepts' OLED wallpapers: true #000, no glow, one lit accent
+NAME="OLED"
+DESC="True black for OLED screens: no glow, no transparency"
+DARK=1
+STYLE="oled"
+BG="#000000"; SURFACE="#000000"; PANEL="#c9d3e3"; FG="#c9d3e3"; MUTED="#5c6675"; LINE="#1a1d22"
+ACCENT="#f28c28"; ACCENT2="#c9d3e3"
+RED="#e06c75"; GREEN="#7fc8a0"; YELLOW="#e5c07b"; BLUE="#7aa2d8"; MAGENTA="#b49ad8"; CYAN="#7cc4cf"
+MARK="ci"; MOTIF="oled"
+WIN_OPACITY="1.0"; TERM_OPACITY="1.0"; BLUR=0; RADIUS=0; BORDER=1; GAPS_IN=4; GAPS_OUT=10
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Classic"

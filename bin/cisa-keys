@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# On-screen cheat sheet of the CISA Hyprland shortcuts (Super+/). Super = the Windows key.
+fuzzel --dmenu --prompt "keys  " --width 72 --lines 16 --placeholder "type to search shortcuts" >/dev/null <<'EOF'
+Super                     open apps (like the Start menu)
+Super + Enter / T         terminal
+Super + E                 files
+Super + B                 browser
+Super + L                 lock the screen
+Super + X                 power menu (log out, restart, shut down)
+Alt + F4 / Super + Q      close the window
+Alt + Tab                 switch windows
+Super + 1 ... 9           go to desktop 1 ... 9
+Super + Shift + 1 ... 9   move window to desktop 1 ... 9
+Super + arrows            move focus between windows
+Super + Shift + arrows    move the window
+Super + Ctrl + arrows     resize the window
+Super + drag              move a window (right-drag resizes)
+Super + W                 float / tile the window
+Super + F                 fullscreen
+Super + V                 clipboard history (like Windows)
+Super + Shift + S         screenshot of an area (also Print Screen)
+Shift + Print             screenshot of the whole screen
+Super + C                 colour picker (copies the hex code)
+Super + N                 notifications
+Super + D                 dashboard (system info, calendar, visualiser)
+Super + Shift + T         change theme
+Super + S                 scratchpad (Super + Alt + S sends a window there)
+Super + /                 this list
+EOF

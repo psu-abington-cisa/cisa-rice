@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Clipboard history (Super+V, like Windows): pick an entry to copy it again.
+cliphist list | fuzzel --dmenu --prompt "clipboard  " --width 70 --lines 12 --placeholder "search what you copied" \
+  | cliphist decode | wl-copy

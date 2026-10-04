@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
-# Render every theme's wallpaper to dev/previews/ (for checking designs without a KDE session).
+# Render every theme's wallpaper, lock background and icon to dev/previews/ (no KDE/Hyprland needed).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 command -v rsvg-convert >/dev/null || apt-get install -y librsvg2-bin >/dev/null
-source lib/wallpaper.sh
 mkdir -p dev/previews
-for t in themes/*.theme; do
-  ( source "$t"; id=$(basename "$t" .theme)
-    make_wallpaper_svg "dev/previews/$id.svg" assets/cisa-logo.png
-    rsvg-convert -w 1280 -h 720 "dev/previews/$id.svg" -o "dev/previews/$id.png"
-    rm "dev/previews/$id.svg"; echo "rendered $id" )
-done
+python3 - <<'PY'
+import pathlib, subprocess, sys
+sys.path.insert(0, "lib")
+import art
+out = pathlib.Path("dev/previews")
+for f in sorted(pathlib.Path("themes").glob("*.theme")):
+    t = art.load_theme(f.stem)
+    for kind, svg, w, h in (("wall", art.wallpaper_svg(t), 1280, 720), ("lock", art.lock_svg(t), 640, 360),
+                            ("icon", art.icon_svg(t), 128, 128)):
+        p = out / f"{f.stem}-{kind}.svg"
+        p.write_text(svg)
+        subprocess.run(["rsvg-convert", "-w", str(w), "-h", str(h), str(p), "-o", str(p.with_suffix(".png"))], check=True)
+        p.unlink()
+    print("rendered", f.stem)
+PY

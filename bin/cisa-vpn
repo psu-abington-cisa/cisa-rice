@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Waybar module: shows the lab VPN (tun0: TryHackMe / OffSec) IP; --copy puts it on the clipboard.
+ip4=$(ip -4 -o addr show tun0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+if [[ ${1:-} == --copy ]]; then
+  if [[ -n $ip4 ]]; then
+    printf '%s' "$ip4" | wl-copy
+    notify-send -a "CISA" "VPN IP copied" "$ip4 is on your clipboard (paste it as LHOST)."
+  else
+    notify-send -a "CISA" "Not connected" "Import your TryHackMe/OffSec .ovpn file in the network menu, then switch it on."
+  fi
+  exit 0
+fi
+if [[ -n $ip4 ]]; then
+  printf '{"text":"\\uf132 %s","class":"on","tooltip":"Lab VPN connected (tun0)\\nClick to copy your IP"}\n' "$ip4"
+else
+  printf '{"text":"\\uf132 vpn off","class":"off","tooltip":"Lab VPN not connected"}\n'
+fi

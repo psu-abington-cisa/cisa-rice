@@ -1,0 +1,11 @@
+# Glossy glass: frosted, transparent windows and bar over a vivid aurora
+NAME="Glass"
+DESC="Glossy and transparent: frosted glass over an aurora"
+DARK=1
+STYLE="glass"
+BG="#0a0f1f"; SURFACE="#141b33"; PANEL="#ffffff"; FG="#f4f7ff"; MUTED="#aab4d0"; LINE="#3a4566"
+ACCENT="#7ad7ff"; ACCENT2="#c8a8ff"
+RED="#ff7a9a"; GREEN="#7dffc4"; YELLOW="#ffe08a"; BLUE="#7ab4ff"; MAGENTA="#d9a8ff"; CYAN="#7ad7ff"
+MARK="badge"; MOTIF="aurora"
+WIN_OPACITY="0.78"; TERM_OPACITY="0.55"; BLUR=1; RADIUS=16; BORDER=2; GAPS_IN=7; GAPS_OUT=16
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"

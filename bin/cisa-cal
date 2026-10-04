@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""A boxed month calendar for the terminal, in the CISA theme colours.
+
+Keys: h / [  previous month   l / ]  next month   t  today   q  quit
+"""
+import calendar
+import datetime as dt
+import os
+import pathlib
+import select
+import shlex
+import shutil
+import sys
+import termios
+import tty
+
+
+def theme():
+    env = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local/share")) / "cisa-rice/current/theme.env"
+    vals = {}
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                vals[k] = shlex.split(v)[0] if v else ""
+    return vals
+
+
+def fg(h):
+    h = h.lstrip("#")
+    return f"\033[38;2;{int(h[0:2], 16)};{int(h[2:4], 16)};{int(h[4:6], 16)}m"
+
+
+T = theme()
+ACC, TXT, MUT = fg(T.get("ACCENT", "#5fd7ff")), fg(T.get("FG", "#ffffff")), fg(T.get("MUTED", "#888888"))
+B, R = "\033[1m", "\033[0m"
+
+
+def draw(year, month):
+    cols, rows = shutil.get_terminal_size((80, 24))
+    today = dt.date.today()
+    title = f"{calendar.month_name[month]} {year}"
+    width = 52
+    out = []
+    pad = " " * max((cols - width) // 2, 0)
+    out.append(pad + TXT + "┌" + "─" * (width - 2) + "┐" + R)
+    out.append(pad + TXT + "│" + R + B + TXT + title.center(width - 2) + R + TXT + "│" + R)
+    out.append(pad + TXT + "└" + "─" * (width - 2) + "┘" + R)
+    out.append("")
+    head = MUT + " wk  ┊" + R + "".join(f"  {d}" for d in ("mo", "tu", "we", "th", "fr")) + MUT + "  sa  su" + R
+    out.append(pad + "  " + head)
+    out.append(pad + "  " + MUT + " ──  ┊" + "  ──" * 7 + R)
+    for week in calendar.Calendar().monthdatescalendar(year, month):
+        wk = week[0].isocalendar()[1]
+        cells = []
+        for i, d in enumerate(week):
+            s = f"{d.day:>2}"
+            if d.month != month:
+                cells.append(MUT + "  " + " ·" + R)
+            elif d == today:
+                cells.append(f"  {B}{ACC}{s}{R}")
+            elif i >= 5:
+                cells.append(f"  {MUT}{s}{R}")
+            else:
+                cells.append(f"  {TXT}{s}{R}")
+        out.append(pad + "  " + MUT + f" {wk:02d}  ┊" + R + "".join(cells))
+    out.append("")
+    out.append(pad + MUT + "──" + R + TXT + " h/l" + MUT + " · month   " + TXT + "t" + MUT + " · today   "
+               + TXT + "q" + MUT + " · quit ──" + R)
+    top = max((rows - len(out)) // 2, 0)
+    sys.stdout.write("\033[2J\033[H" + "\n" * top + "\n".join(out))
+    sys.stdout.flush()
+
+
+def main():
+    d = dt.date.today()
+    y, m = d.year, d.month
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    sys.stdout.write("\033[?25l")
+    try:
+        tty.setcbreak(fd)
+        while True:
+            draw(y, m)
+            r, _, _ = select.select([sys.stdin], [], [], 60)
+            if not r:
+                continue
+            k = sys.stdin.read(1)
+            if k in "q\x1b":
+                break
+            if k in "h[":
+                y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+            elif k in "l]":
+                y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+            elif k == "t":
+                y, m = dt.date.today().year, dt.date.today().month
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stdout.write("\033[?25h\033[2J\033[H")
+
+
+if __name__ == "__main__":
+    main()

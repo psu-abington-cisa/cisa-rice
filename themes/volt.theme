@@ -1,0 +1,11 @@
+# P3 from the CISA logo concepts: violet and chartreuse
+NAME="Volt"
+DESC="Violet and chartreuse, with the ci seal"
+DARK=1
+STYLE="solid"
+BG="#1f1446"; SURFACE="#2a1d57"; PANEL="#dcd5f5"; FG="#dcd5f5"; MUTED="#a097bd"; LINE="#584e7a"
+ACCENT="#c9ee3f"; ACCENT2="#e2ff8a"
+RED="#ff6f91"; GREEN="#c9ee3f"; YELLOW="#ffd36e"; BLUE="#8fa8ff"; MAGENTA="#d79cff"; CYAN="#7fe3e0"
+MARK="ci"; MOTIF="seal"; ACCENT_ON_PANEL="#667f0b"
+WIN_OPACITY="0.95"; TERM_OPACITY="0.9"; BLUR=1; RADIUS=6; BORDER=2; GAPS_IN=5; GAPS_OUT=12
+ICONS="Papirus-Dark"; CURSOR="Bibata-Modern-Ice"

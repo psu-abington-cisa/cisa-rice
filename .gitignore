@@ -1,2 +1,4 @@
 dev/previews/
 dev/vm-shots/
+__pycache__/
+*.pyc

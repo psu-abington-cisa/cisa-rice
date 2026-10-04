@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Open the CISA dashboard (Super+D): system info on the left, clock and calendar on the right.
+# With --first-login it only runs the first time you log in to Hyprland.
+state="${XDG_DATA_HOME:-$HOME/.local/share}/cisa-rice"
+if [[ ${1:-} == --first-login ]]; then
+  [[ -e $state/.dashboard-shown ]] && exit 0
+  mkdir -p "$state"; touch "$state/.dashboard-shown"
+  sleep 2
+fi
+open() { hyprctl dispatch exec "$1" >/dev/null; sleep 0.6; }
+# dwindle tiling: 1st window fills, 2nd splits it side by side, 3rd splits the 2nd top/bottom
+open "kitty --class cisa-fetch"
+open "kitty --class cisa-clock -e cisa-clock"
+open "kitty --class cisa-cal -e cisa-cal"

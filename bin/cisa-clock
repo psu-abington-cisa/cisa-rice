@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Big block-digit clock for the terminal, in the CISA theme colours. q quits."""
+import datetime as dt
+import os
+import pathlib
+import select
+import shlex
+import shutil
+import sys
+import termios
+import tty
+
+DIGITS = {
+    "0": ["█████", "█   █", "█   █", "█   █", "█████"], "1": ["  █  ", " ██  ", "  █  ", "  █  ", " ███ "],
+    "2": ["█████", "    █", "█████", "█    ", "█████"], "3": ["█████", "    █", " ████", "    █", "█████"],
+    "4": ["█   █", "█   █", "█████", "    █", "    █"], "5": ["█████", "█    ", "█████", "    █", "█████"],
+    "6": ["█████", "█    ", "█████", "█   █", "█████"], "7": ["█████", "    █", "   █ ", "  █  ", "  █  "],
+    "8": ["█████", "█   █", "█████", "█   █", "█████"], "9": ["█████", "█   █", "█████", "    █", "█████"],
+    ":": ["   ", " █ ", "   ", " █ ", "   "],
+}
+
+
+def theme():
+    env = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local/share")) / "cisa-rice/current/theme.env"
+    vals = {}
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                vals[k] = shlex.split(v)[0] if v else ""
+    return vals
+
+
+def fg(h):
+    h = h.lstrip("#")
+    return f"\033[38;2;{int(h[0:2], 16)};{int(h[2:4], 16)};{int(h[4:6], 16)}m"
+
+
+T = theme()
+ACC, TXT, MUT, R = fg(T.get("ACCENT", "#5fd7ff")), fg(T.get("FG", "#ffffff")), fg(T.get("MUTED", "#888888")), "\033[0m"
+
+
+def draw():
+    cols, rows = shutil.get_terminal_size((60, 20))
+    now = dt.datetime.now()
+    s = now.strftime("%H:%M")
+    lines = [" ".join(DIGITS[c][i] for c in s) for i in range(5)]
+    width = len(lines[0])
+    pad = " " * max((cols - width) // 2, 0)
+    date = now.strftime("%A %d %B").lower()
+    sec = now.second
+    bar_w = min(width, cols - 4)
+    filled = round(bar_w * sec / 60)
+    out = [pad + TXT + l + R for l in lines]
+    out += ["", " " * max((cols - len(date)) // 2, 0) + MUT + date + R, "",
+            " " * max((cols - bar_w) // 2, 0) + ACC + "━" * filled + MUT + "─" * (bar_w - filled) + R]
+    top = max((rows - len(out)) // 2, 0)
+    sys.stdout.write("\033[2J\033[H" + "\n" * top + "\n".join(out))
+    sys.stdout.flush()
+
+
+def main():
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    sys.stdout.write("\033[?25l")
+    try:
+        tty.setcbreak(fd)
+        while True:
+            draw()
+            r, _, _ = select.select([sys.stdin], [], [], 1)
+            if r and sys.stdin.read(1) in "q\x1b":
+                break
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stdout.write("\033[?25h\033[2J\033[H")
+
+
+if __name__ == "__main__":
+    main()

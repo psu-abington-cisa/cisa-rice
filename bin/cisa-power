@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Power menu (Super+X), sized to the screen: five large buttons across the middle.
+pkill -x wlogout && exit 0
+read -r w h < <(hyprctl monitors -j 2>/dev/null | python3 -c '
+import json, sys
+m = [x for x in json.load(sys.stdin) if x.get("focused")] or [{"width": 1920, "height": 1080, "scale": 1}]
+s = m[0].get("scale", 1) or 1
+print(int(m[0]["width"] / s), int(m[0]["height"] / s))' 2>/dev/null || echo "1920 1080")
+tb=$(( h * 33 / 100 )); lr=$(( w * 8 / 100 ))
+exec wlogout -b 5 -c 20 -r 20 -T "$tb" -B "$tb" -L "$lr" -R "$lr"
